@@ -1,0 +1,28 @@
+{
+  "name": "super-language-server",
+  "version": "0.1.0",
+  "description": "A meta-language server for Markdown files with embedded code blocks",
+  "type": "module",
+  "main": "dist/server.js",
+  "bin": {
+    "super-language-server": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "mdast-util-from-markdown": "^2.0.2",
+    "unist-util-visit": "^5.0.0",
+    "vscode-jsonrpc": "^8.2.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12",
+    "vscode-languageserver-protocol": "^3.17.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
