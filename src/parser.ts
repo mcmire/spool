@@ -25,12 +25,12 @@ export function parseSourceBlocks(content: string): {
   const lines = content.split("\n");
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const line = lines[i]!;
     const match = SOURCE_ANNOTATION_RE.exec(line);
 
     if (match) {
-      const isClosing = match[2] === "/";
-      const blockName = match[3];
+      const isClosing = match[2]! === "/";
+      const blockName = match[3]!;
 
       if (isClosing) {
         if (stack.length === 0) {
@@ -39,11 +39,11 @@ export function parseSourceBlocks(content: string): {
             column: 1,
             message: `Closing block </${blockName}> without matching open`,
           });
-        } else if (stack[stack.length - 1].name !== blockName) {
+        } else if (stack[stack.length - 1]!.name !== blockName) {
           errors.push({
             line: i + 1,
             column: 1,
-            message: `Mismatched close: expected </${stack[stack.length - 1].name}>, got </${blockName}>`,
+            message: `Mismatched close: expected </${stack[stack.length - 1]!.name}>, got </${blockName}>`,
           });
         } else {
           const closed = stack.pop()!;
@@ -88,13 +88,13 @@ export function parseDocReferences(content: string): {
   for (let i = 0; i < lines.length; i++) {
     let match: RegExpExecArray | null;
     DOC_REFERENCE_RE.lastIndex = 0;
-    while ((match = DOC_REFERENCE_RE.exec(lines[i])) !== null) {
+    while ((match = DOC_REFERENCE_RE.exec(lines[i]!)) !== null) {
       refs.push({
-        filePath: match[1],
-        blockName: match[2],
+        filePath: match[1]!,
+        blockName: match[2]!,
         line: i + 1,
         column: match.index + 1,
-        raw: match[0],
+        raw: match[0]!,
       });
     }
   }
