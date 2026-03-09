@@ -27,12 +27,9 @@ export function startServer(): void {
   let registry: BlockRegistry = new Map();
   let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
 
-  connection.onInitialize((_params): InitializeResult => {
-    try {
-      projectRoot = findProjectRoot(process.cwd());
-    } catch {
-      // Will be set later if possible
-    }
+  connection.onInitialize(async (_params): Promise<InitializeResult> => {
+    projectRoot = findProjectRoot(process.cwd());
+    config = await loadConfig(projectRoot);
 
     return {
       capabilities: {
@@ -42,14 +39,7 @@ export function startServer(): void {
   });
 
   connection.onInitialized(async () => {
-    if (projectRoot) {
-      try {
-        config = await loadConfig(projectRoot);
-        await rebuildRegistry();
-      } catch (err) {
-        connection.console.error(`Failed to load config: ${err}`);
-      }
-    }
+    await rebuildRegistry();
   });
 
   async function rebuildRegistry(): Promise<void> {
