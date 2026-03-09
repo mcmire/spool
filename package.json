@@ -1,0 +1,22 @@
+{
+  "name": "spool",
+  "type": "module",
+  "bin": {
+    "spool": "src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "marked": "^15.0.7",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  },
+  "devDependencies": {
+    "@tsconfig/node-ts": "^23.6.4",
+    "@types/bun": "^1.2.5",
+    "typescript": "^5.8.2"
+  }
+}
