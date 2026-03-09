@@ -19,7 +19,7 @@ import { buildRegistry } from "../registry.ts";
 import type { BlockRegistry } from "../registry.ts";
 
 export function startServer(): void {
-  const connection = createConnection(ProposedFeatures.all);
+  const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
   const documents = new TextDocuments(TextDocument);
 
   let projectRoot: string | null = null;
