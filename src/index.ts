@@ -18,7 +18,7 @@ program
 
 program
   .command("lint")
-  .description("Check for errors in source annotations and doc references")
+  .description("Check for errors in source annotations and passage references")
   .action(async () => {
     const { lintCommand } = await import("./commands/lint.ts");
     await lintCommand();

@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { Glob } from "bun";
 import { findProjectRoot, loadConfig } from "../config.ts";
-import { parseDocReferences } from "../parser.ts";
+import { parsePassageReferences } from "../parser.ts";
 import { buildRegistry } from "../registry.ts";
 import type { FileErrors } from "../registry.ts";
 
@@ -29,11 +29,11 @@ export async function lintCommand(): Promise<void> {
   for await (const entry of glob.scan({ cwd: docsDir })) {
     const fullPath = join(docsDir, entry);
     const content = await readFile(fullPath, "utf-8");
-    const { refs } = parseDocReferences(content);
+    const { refs } = parsePassageReferences(content);
 
     const errors = [];
     for (const ref of refs) {
-      const key = `${ref.filePath}:${ref.blockName}`;
+      const key = `${ref.filePath}:${ref.passageName}`;
       if (!registry.has(key)) {
         errors.push({
           line: ref.line,
@@ -57,7 +57,7 @@ export async function lintCommand(): Promise<void> {
   }
 
   if (docErrors.length > 0) {
-    console.error("Doc reference errors:");
+    console.error("Passage reference errors:");
     printErrors(docErrors);
   }
 

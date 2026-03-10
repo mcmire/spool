@@ -2,10 +2,10 @@ import { readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { Glob } from "bun";
 import type { ParseError } from "./parser.ts";
-import { parseSourceBlocks } from "./parser.ts";
+import { parseSourcePassages } from "./parser.ts";
 import type { SpoolConfig } from "./config.ts";
 
-export type BlockRegistry = Map<string, string>;
+export type PassageRegistry = Map<string, string>;
 
 export type FileErrors = {
   filePath: string;
@@ -15,8 +15,8 @@ export type FileErrors = {
 export async function buildRegistry(
   projectRoot: string,
   config: SpoolConfig,
-): Promise<{ registry: BlockRegistry; errors: FileErrors[] }> {
-  const registry: BlockRegistry = new Map();
+): Promise<{ registry: PassageRegistry; errors: FileErrors[] }> {
+  const registry: PassageRegistry = new Map();
   const allErrors: FileErrors[] = [];
   const sourceDir = join(projectRoot, config.sourceCodeDir);
   const docsDir = join(projectRoot, config.sourceDocsDir);
@@ -37,7 +37,7 @@ export async function buildRegistry(
         continue;
       }
 
-      const { blocks, errors } = parseSourceBlocks(content);
+      const { passages, errors } = parseSourcePassages(content);
 
       if (errors.length > 0) {
         const relPath = relative(projectRoot, fullPath);
@@ -45,7 +45,7 @@ export async function buildRegistry(
       }
 
       const relPath = relative(projectRoot, fullPath);
-      for (const [name, value] of blocks) {
+      for (const [name, value] of passages) {
         registry.set(`${relPath}:${name}`, value);
       }
     } catch {

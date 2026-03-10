@@ -4,22 +4,22 @@ export type ParseError = {
   message: string;
 };
 
-export type DocReference = {
+export type PassageReference = {
   filePath: string;
-  blockName: string;
+  passageName: string;
   line: number;
   column: number;
   raw: string;
 };
 
 const SOURCE_ANNOTATION_RE = /^(.*?)::spool::\s*<(\/?)([\w-]+)>\s*$/;
-const DOC_REFERENCE_RE = /^.*?::spool::\s*\{\{(.+?):([\w-]+)\}\}/;
+const PASSAGE_REFERENCE_RE = /^.*?::spool::\s*\{\{(.+?):([\w-]+)\}\}/;
 
-export function parseSourceBlocks(content: string): {
-  blocks: Map<string, string>;
+export function parseSourcePassages(content: string): {
+  passages: Map<string, string>;
   errors: ParseError[];
 } {
-  const blocks = new Map<string, string>();
+  const passages = new Map<string, string>();
   const errors: ParseError[] = [];
   const stack: { name: string; lines: string[] }[] = [];
   const lines = content.split("\n");
@@ -30,34 +30,34 @@ export function parseSourceBlocks(content: string): {
 
     if (match) {
       const isClosing = match[2]! === "/";
-      const blockName = match[3]!;
+      const passageName = match[3]!;
 
       if (isClosing) {
         if (stack.length === 0) {
           errors.push({
             line: i + 1,
             column: 1,
-            message: `Closing block </${blockName}> without matching open`,
+            message: `Closing passage </${passageName}> without matching open`,
           });
-        } else if (stack[stack.length - 1]!.name !== blockName) {
+        } else if (stack[stack.length - 1]!.name !== passageName) {
           errors.push({
             line: i + 1,
             column: 1,
-            message: `Mismatched close: expected </${stack[stack.length - 1]!.name}>, got </${blockName}>`,
+            message: `Mismatched close: expected </${stack[stack.length - 1]!.name}>, got </${passageName}>`,
           });
         } else {
           const closed = stack.pop()!;
-          blocks.set(blockName, closed.lines.join("\n"));
+          passages.set(passageName, closed.lines.join("\n"));
         }
       } else {
-        if (blocks.has(blockName)) {
+        if (passages.has(passageName)) {
           errors.push({
             line: i + 1,
             column: 1,
-            message: `Duplicate block name "${blockName}" in same file`,
+            message: `Duplicate passage name "${passageName}" in same file`,
           });
         }
-        stack.push({ name: blockName, lines: [] });
+        stack.push({ name: passageName, lines: [] });
       }
     } else {
       for (const frame of stack) {
@@ -70,28 +70,28 @@ export function parseSourceBlocks(content: string): {
     errors.push({
       line: 1,
       column: 1,
-      message: `Unclosed block <${frame.name}>`,
+      message: `Unclosed passage <${frame.name}>`,
     });
   }
 
-  return { blocks, errors };
+  return { passages, errors };
 }
 
-export function parseDocReferences(content: string): {
-  refs: DocReference[];
+export function parsePassageReferences(content: string): {
+  refs: PassageReference[];
   errors: ParseError[];
 } {
-  const refs: DocReference[] = [];
+  const refs: PassageReference[] = [];
   const errors: ParseError[] = [];
   const lines = content.split("\n");
 
   for (let i = 0; i < lines.length; i++) {
-    const match = DOC_REFERENCE_RE.exec(lines[i]!);
+    const match = PASSAGE_REFERENCE_RE.exec(lines[i]!);
     if (match) {
       const raw = `{{${match[1]!}:${match[2]!}}}`;
       refs.push({
         filePath: match[1]!,
-        blockName: match[2]!,
+        passageName: match[2]!,
         line: i + 1,
         column: match[0]!.indexOf("{{") + 1,
         raw,

@@ -2,16 +2,16 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { Glob } from "bun";
 import type { ParseError } from "./parser.ts";
-import { parseDocReferences } from "./parser.ts";
-import type { BlockRegistry, FileErrors } from "./registry.ts";
+import { parsePassageReferences } from "./parser.ts";
+import type { PassageRegistry, FileErrors } from "./registry.ts";
 import { buildRegistry } from "./registry.ts";
 import type { SpoolConfig } from "./config.ts";
 
 export function weaveFile(
   docContent: string,
-  registry: BlockRegistry,
+  registry: PassageRegistry,
 ): { output: string; errors: ParseError[] } {
-  const { refs, errors } = parseDocReferences(docContent);
+  const { refs, errors } = parsePassageReferences(docContent);
 
   let output = docContent;
   // Replace in reverse order to preserve positions
@@ -23,16 +23,16 @@ export function weaveFile(
   });
 
   for (const ref of sortedRefs) {
-    const key = `${ref.filePath}:${ref.blockName}`;
-    const blockContent = registry.get(key);
-    if (blockContent === undefined) {
+    const key = `${ref.filePath}:${ref.passageName}`;
+    const passageContent = registry.get(key);
+    if (passageContent === undefined) {
       errors.push({
         line: ref.line,
         column: ref.column,
         message: `Unknown reference: ${ref.raw}`,
       });
     } else {
-      output = output.replace(ref.raw, blockContent);
+      output = output.replace(ref.raw, passageContent);
     }
   }
 

@@ -14,9 +14,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findProjectRoot, loadConfig } from "../config.ts";
 import type { SpoolConfig } from "../config.ts";
-import { parseSourceBlocks, parseDocReferences } from "../parser.ts";
+import { parseSourcePassages, parsePassageReferences } from "../parser.ts";
 import { buildRegistry } from "../registry.ts";
-import type { BlockRegistry } from "../registry.ts";
+import type { PassageRegistry } from "../registry.ts";
 
 export function startServer(): void {
   const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
@@ -24,7 +24,7 @@ export function startServer(): void {
 
   let projectRoot: string | null = null;
   let config: SpoolConfig | null = null;
-  let registry: BlockRegistry = new Map();
+  let registry: PassageRegistry = new Map();
   let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
 
   connection.onInitialize(async (_params): Promise<InitializeResult> => {
@@ -102,7 +102,7 @@ export function startServer(): void {
     const content = document.getText();
 
     if (isSourceFile(filePath)) {
-      const { errors } = parseSourceBlocks(content);
+      const { errors } = parseSourcePassages(content);
       for (const error of errors) {
         diagnostics.push({
           severity: DiagnosticSeverity.Error,
@@ -115,9 +115,9 @@ export function startServer(): void {
         });
       }
     } else if (isDocFile(filePath)) {
-      const { refs } = parseDocReferences(content);
+      const { refs } = parsePassageReferences(content);
       for (const ref of refs) {
-        const key = `${ref.filePath}:${ref.blockName}`;
+        const key = `${ref.filePath}:${ref.passageName}`;
         if (!registry.has(key)) {
           diagnostics.push({
             severity: DiagnosticSeverity.Error,

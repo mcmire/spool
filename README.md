@@ -2,7 +2,7 @@
 
 Reverse literate programming CLI. Start with annotated source code, weave it into publishable Markdown docs.
 
-Traditional literate programming tangles documentation into source. Spool works the other way: you annotate your source code with named blocks, write doc templates that reference those blocks, and spool weaves them together into final Markdown.
+Traditional literate programming tangles documentation into source. Spool works the other way: you annotate your source code with named passages, write doc templates that reference those passages, and spool weaves them together into final Markdown.
 
 The annotation syntax is language-agnostic — it works with any comment style (`//`, `#`, `--`, `%`, `;`, etc.).
 
@@ -20,7 +20,7 @@ export class Car {
 //::spool:: </car-class>
 ```
 
-**2. Reference blocks in your doc templates:**
+**2. Reference passages in your doc templates:**
 
 ```md
 ## The Car Class
@@ -32,7 +32,7 @@ export class Car {
 
 **3. Run `spool weave` to produce the final docs.**
 
-Blocks are referenced by `::spool:: {{relativePath:blockName}}` where the path is relative to the project root. Any comment characters before `::spool::` are ignored, so `//::spool:: {{...}}`, `# ::spool:: {{...}}`, etc. all work. Blocks can be nested — content lines are added to all currently-open blocks on the stack.
+Passages are referenced by `::spool:: {{relativePath:passageName}}` where the path is relative to the project root. Any comment characters before `::spool::` are ignored, so `//::spool:: {{...}}`, `# ::spool:: {{...}}`, etc. all work. Passages can be nested — content lines are added to all currently-open passages on the stack.
 
 ## Setup
 
