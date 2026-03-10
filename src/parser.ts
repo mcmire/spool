@@ -15,6 +15,7 @@ export type PassageReference = {
 
 export type NestedRef = {
   name: string;
+  prefix: string;
   startIdx: number;
   endIdx: number;
 };
@@ -77,7 +78,7 @@ export function parseSourcePassages(content: string): {
         }
         if (stack.length > 0) {
           const parent = stack[stack.length - 1]!;
-          parent.nestedRefs.push({ name: passageName, startIdx: parent.lines.length, endIdx: -1 });
+          parent.nestedRefs.push({ name: passageName, prefix: match[1]!, startIdx: parent.lines.length, endIdx: -1 });
         }
         stack.push({ name: passageName, lines: [], nestedRefs: [] });
       }

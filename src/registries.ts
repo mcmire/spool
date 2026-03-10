@@ -22,7 +22,7 @@ function buildTemplateContent(
   let i = 0;
   for (const nested of nestedRefs) {
     result.push(...lines.slice(i, nested.startIdx));
-    result.push(`::spool:: {{${relPath}:${nested.name}}}`);
+    result.push(`${nested.prefix}::spool:: {{${relPath}:${nested.name}}}`);
     i = nested.endIdx;
   }
   result.push(...lines.slice(i));
