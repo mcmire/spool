@@ -16,6 +16,12 @@ function htmlShell(title: string, body: string): string {
     body { max-width: 800px; margin: 2rem auto; padding: 0 1rem; font-family: system-ui, sans-serif; line-height: 1.6; }
     pre { background: #f4f4f4; padding: 1rem; overflow-x: auto; border-radius: 4px; }
     code { font-size: 0.9em; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #1a1a1a; color: #e0e0e0; }
+      pre { background: #2a2a2a; }
+      a { color: #7ab3f5; }
+      a:visited { color: #b59af5; }
+    }
   </style>
 </head>
 <body>
