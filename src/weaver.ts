@@ -13,17 +13,9 @@ export function weaveFile(
   templateRegistry: PassageTemplateRegistry,
 ): { output: string; errors: ParseError[] } {
   const { refs, errors } = parsePassageReferences(docContent);
+  const lines = docContent.split("\n");
 
-  let output = docContent;
-  // Replace in reverse order to preserve positions
-  const sortedRefs = [...refs].sort((a, b) => {
-    if (a.line !== b.line) {
-      return b.line - a.line;
-    }
-    return b.column - a.column;
-  });
-
-  for (const ref of sortedRefs) {
+  for (const ref of refs) {
     if (ref.modifier !== undefined && !VALID_MODIFIERS.has(ref.modifier)) {
       errors.push({
         line: ref.line,
@@ -42,11 +34,11 @@ export function weaveFile(
         message: `Unknown reference: ${ref.raw}`,
       });
     } else {
-      output = output.replace(ref.raw, passageContent);
+      lines[ref.line - 1] = passageContent;
     }
   }
 
-  return { output, errors };
+  return { output: lines.join("\n"), errors };
 }
 
 export type WeaveResult = {
