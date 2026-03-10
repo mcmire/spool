@@ -4,9 +4,10 @@
   "type": "module",
   "private": true,
   "bin": {
-    "spool": "src/cli.ts"
+    "spool": "dist/cli.js"
   },
   "scripts": {
+    "build": "tsc --project tsconfig.build.json",
     "lint": "tsc --noEmit",
     "run-tool": "bun run src/cli.ts"
   },
