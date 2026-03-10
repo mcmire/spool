@@ -3,8 +3,8 @@ import { dirname, join, relative } from "node:path";
 import { Glob } from "bun";
 import type { ParseError } from "./parser.ts";
 import { parsePassageReferences } from "./parser.ts";
-import type { PassageRegistry, FileErrors } from "./registry.ts";
-import { buildRegistry } from "./registry.ts";
+import type { PassageRegistry, FileErrors } from "./passage-registry.ts";
+import { buildRegistry } from "./passage-registry.ts";
 import type { SpoolConfig } from "./config.ts";
 
 export function weaveFile(

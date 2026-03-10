@@ -15,8 +15,8 @@ import { fileURLToPath } from "node:url";
 import { findProjectRoot, loadConfig } from "../config.ts";
 import type { SpoolConfig } from "../config.ts";
 import { parseSourcePassages, parsePassageReferences } from "../parser.ts";
-import { buildRegistry } from "../registry.ts";
-import type { PassageRegistry } from "../registry.ts";
+import { buildRegistry } from "../passage-registry.ts";
+import type { PassageRegistry } from "../passage-registry.ts";
 
 export function startServer(): void {
   const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
