@@ -1,4 +1,7 @@
+import { watch } from "node:fs";
+import { join } from "node:path";
 import { findProjectRoot, loadConfig } from "../config.ts";
+import type { SpoolConfig } from "../config.ts";
 import { weaveProject } from "../weaver.ts";
 import type { FileErrors } from "../registries.ts";
 
@@ -10,9 +13,7 @@ function printErrors(fileErrors: FileErrors[]): void {
   }
 }
 
-export async function weaveCommand(): Promise<void> {
-  const projectRoot = findProjectRoot(process.cwd());
-  const config = await loadConfig(projectRoot);
+async function runWeave(projectRoot: string, config: SpoolConfig): Promise<boolean> {
   const result = await weaveProject(projectRoot, config);
 
   console.log(
@@ -32,7 +33,53 @@ export async function weaveCommand(): Promise<void> {
     printErrors(result.weaveErrors);
   }
 
-  if (hasErrors) {
-    process.exit(1);
+  return hasErrors;
+}
+
+export async function weaveCommand(options: { watch?: boolean }): Promise<void> {
+  const projectRoot = findProjectRoot(process.cwd());
+  const config = await loadConfig(projectRoot);
+
+  const hasErrors = await runWeave(projectRoot, config);
+
+  if (!options.watch) {
+    if (hasErrors) {
+      process.exit(1);
+    }
+    return;
+  }
+
+  const sourceDir = join(projectRoot, config.sourceCodeDir);
+  const docsDir = join(projectRoot, config.sourceDocsDir);
+
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function scheduleReweave(): void {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    debounceTimer = setTimeout(async () => {
+      try {
+        await runWeave(projectRoot, config);
+      } catch (err) {
+        console.error("Re-weave failed:", err);
+      }
+    }, 200);
+  }
+
+  console.log("Watching for changes…");
+
+  watch(sourceDir, { recursive: true }, (_event, filename) => {
+    if (filename) {
+      scheduleReweave();
+    }
+  });
+
+  if (!docsDir.startsWith(sourceDir)) {
+    watch(docsDir, { recursive: true }, (_event, filename) => {
+      if (filename) {
+        scheduleReweave();
+      }
+    });
   }
 }

@@ -11,9 +11,10 @@ program
 program
   .command("weave")
   .description("Weave source annotations into documentation files")
-  .action(async () => {
+  .option("-w, --watch", "Watch for changes and re-weave automatically")
+  .action(async (options: { watch?: boolean }) => {
     const { weaveCommand } = await import("./commands/weave.ts");
-    await weaveCommand();
+    await weaveCommand(options);
   });
 
 program
