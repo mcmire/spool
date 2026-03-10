@@ -7,21 +7,34 @@ export type ParseError = {
 export type PassageReference = {
   filePath: string;
   passageName: string;
+  modifier?: string;
   line: number;
   column: number;
   raw: string;
 };
 
+export type NestedRef = {
+  name: string;
+  startIdx: number;
+  endIdx: number;
+};
+
+type Frame = { name: string; lines: string[]; nestedRefs: NestedRef[] };
+
+export const VALID_MODIFIERS = new Set(["no-expand-nested"]);
+
 const SOURCE_ANNOTATION_RE = /^(.*?)::spool::\s*<(\/?)([\w-]+)>\s*$/;
-const PASSAGE_REFERENCE_RE = /^.*?::spool::\s*\{\{(.+?):([\w-]+)\}\}/;
+const PASSAGE_REFERENCE_RE = /^.*?::spool::\s*\{\{(.+?):([\w-]+)(?::([\w-]+))?\}\}/;
 
 export function parseSourcePassages(content: string): {
   passages: Map<string, string>;
+  passageNestedRefs: Map<string, NestedRef[]>;
   errors: ParseError[];
 } {
   const passages = new Map<string, string>();
+  const passageNestedRefs = new Map<string, NestedRef[]>();
   const errors: ParseError[] = [];
-  const stack: { name: string; lines: string[] }[] = [];
+  const stack: Frame[] = [];
   const lines = content.split("\n");
 
   for (let i = 0; i < lines.length; i++) {
@@ -48,6 +61,11 @@ export function parseSourcePassages(content: string): {
         } else {
           const closed = stack.pop()!;
           passages.set(passageName, closed.lines.join("\n"));
+          passageNestedRefs.set(passageName, closed.nestedRefs);
+          if (stack.length > 0) {
+            const parent = stack[stack.length - 1]!;
+            parent.nestedRefs[parent.nestedRefs.length - 1]!.endIdx = parent.lines.length;
+          }
         }
       } else {
         if (passages.has(passageName)) {
@@ -57,7 +75,11 @@ export function parseSourcePassages(content: string): {
             message: `Duplicate passage name "${passageName}" in same file`,
           });
         }
-        stack.push({ name: passageName, lines: [] });
+        if (stack.length > 0) {
+          const parent = stack[stack.length - 1]!;
+          parent.nestedRefs.push({ name: passageName, startIdx: parent.lines.length, endIdx: -1 });
+        }
+        stack.push({ name: passageName, lines: [], nestedRefs: [] });
       }
     } else {
       for (const frame of stack) {
@@ -74,7 +96,7 @@ export function parseSourcePassages(content: string): {
     });
   }
 
-  return { passages, errors };
+  return { passages, passageNestedRefs, errors };
 }
 
 export function parsePassageReferences(content: string): {
@@ -88,10 +110,14 @@ export function parsePassageReferences(content: string): {
   for (let i = 0; i < lines.length; i++) {
     const match = PASSAGE_REFERENCE_RE.exec(lines[i]!);
     if (match) {
-      const raw = `{{${match[1]!}:${match[2]!}}}`;
+      const modifier = match[3];
+      const raw = modifier
+        ? `{{${match[1]!}:${match[2]!}:${modifier}}}`
+        : `{{${match[1]!}:${match[2]!}}}`;
       refs.push({
         filePath: match[1]!,
         passageName: match[2]!,
+        modifier,
         line: i + 1,
         column: match[0]!.indexOf("{{") + 1,
         raw,

@@ -3,8 +3,8 @@ import { join, relative } from "node:path";
 import { Glob } from "bun";
 import { findProjectRoot, loadConfig } from "../config.ts";
 import { parsePassageReferences } from "../parser.ts";
-import { buildRegistry } from "../passage-registry.ts";
-import type { FileErrors } from "../passage-registry.ts";
+import { buildRegistries } from "../registries.ts";
+import type { FileErrors } from "../registries.ts";
 
 function printErrors(fileErrors: FileErrors[]): void {
   for (const { filePath, errors } of fileErrors) {
@@ -17,7 +17,7 @@ function printErrors(fileErrors: FileErrors[]): void {
 export async function lintCommand(): Promise<void> {
   const projectRoot = findProjectRoot(process.cwd());
   const config = await loadConfig(projectRoot);
-  const { registry, errors: registryErrors } = await buildRegistry(
+  const { registry, errors: registryErrors } = await buildRegistries(
     projectRoot,
     config,
   );

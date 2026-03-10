@@ -14,9 +14,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findProjectRoot, loadConfig } from "../config.ts";
 import type { SpoolConfig } from "../config.ts";
-import { parseSourcePassages, parsePassageReferences } from "../parser.ts";
-import { buildRegistry } from "../passage-registry.ts";
-import type { PassageRegistry } from "../passage-registry.ts";
+import { parseSourcePassages, parsePassageReferences, VALID_MODIFIERS } from "../parser.ts";
+import { buildRegistries } from "../registries.ts";
+import type { PassageRegistry, PassageTemplateRegistry } from "../registries.ts";
 
 export function startServer(): void {
   const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
@@ -25,6 +25,7 @@ export function startServer(): void {
   let projectRoot: string | null = null;
   let config: SpoolConfig | null = null;
   let registry: PassageRegistry = new Map();
+  let templateRegistry: PassageTemplateRegistry = new Map();
   let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
 
   connection.onInitialize(async (_params): Promise<InitializeResult> => {
@@ -39,16 +40,17 @@ export function startServer(): void {
   });
 
   connection.onInitialized(async () => {
-    await rebuildRegistry();
+    await rebuildRegistries();
   });
 
-  async function rebuildRegistry(): Promise<void> {
+  async function rebuildRegistries(): Promise<void> {
     if (!projectRoot || !config) {
       return;
     }
     try {
-      const result = await buildRegistry(projectRoot, config);
+      const result = await buildRegistries(projectRoot, config);
       registry = result.registry;
+      templateRegistry = result.templateRegistry;
     } catch (err) {
       connection.console.error(`Failed to rebuild registry: ${err}`);
     }
@@ -59,7 +61,7 @@ export function startServer(): void {
       clearTimeout(rebuildTimer);
     }
     rebuildTimer = setTimeout(async () => {
-      await rebuildRegistry();
+      await rebuildRegistries();
       // Re-validate all open documents after registry rebuild
       for (const doc of documents.all()) {
         validateDocument(doc);
@@ -117,8 +119,24 @@ export function startServer(): void {
     } else if (isDocFile(filePath)) {
       const { refs } = parsePassageReferences(content);
       for (const ref of refs) {
+        if (ref.modifier !== undefined && !VALID_MODIFIERS.has(ref.modifier)) {
+          diagnostics.push({
+            severity: DiagnosticSeverity.Error,
+            range: {
+              start: { line: ref.line - 1, character: ref.column - 1 },
+              end: {
+                line: ref.line - 1,
+                character: ref.column - 1 + ref.raw.length,
+              },
+            },
+            message: `Unknown modifier: ${ref.modifier}`,
+            source: "spool",
+          });
+          continue;
+        }
         const key = `${ref.filePath}:${ref.passageName}`;
-        if (!registry.has(key)) {
+        const source = ref.modifier === "no-expand-nested" ? templateRegistry : registry;
+        if (!source.has(key)) {
           diagnostics.push({
             severity: DiagnosticSeverity.Error,
             range: {

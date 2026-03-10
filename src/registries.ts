@@ -1,22 +1,40 @@
 import { readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { Glob } from "bun";
-import type { ParseError } from "./parser.ts";
+import type { ParseError, NestedRef } from "./parser.ts";
 import { parseSourcePassages } from "./parser.ts";
 import type { SpoolConfig } from "./config.ts";
 
 export type PassageRegistry = Map<string, string>;
+export type PassageTemplateRegistry = Map<string, string>;
 
 export type FileErrors = {
   filePath: string;
   errors: ParseError[];
 };
 
-export async function buildRegistry(
+function buildTemplateContent(
+  lines: string[],
+  nestedRefs: NestedRef[],
+  relPath: string,
+): string {
+  const result: string[] = [];
+  let i = 0;
+  for (const nested of nestedRefs) {
+    result.push(...lines.slice(i, nested.startIdx));
+    result.push(`::spool:: {{${relPath}:${nested.name}}}`);
+    i = nested.endIdx;
+  }
+  result.push(...lines.slice(i));
+  return result.join("\n");
+}
+
+export async function buildRegistries(
   projectRoot: string,
   config: SpoolConfig,
-): Promise<{ registry: PassageRegistry; errors: FileErrors[] }> {
+): Promise<{ registry: PassageRegistry; templateRegistry: PassageTemplateRegistry; errors: FileErrors[] }> {
   const registry: PassageRegistry = new Map();
+  const templateRegistry: PassageTemplateRegistry = new Map();
   const allErrors: FileErrors[] = [];
   const sourceDir = join(projectRoot, config.sourceCodeDir);
   const docsDir = join(projectRoot, config.sourceDocsDir);
@@ -37,7 +55,7 @@ export async function buildRegistry(
         continue;
       }
 
-      const { passages, errors } = parseSourcePassages(content);
+      const { passages, passageNestedRefs, errors } = parseSourcePassages(content);
 
       if (errors.length > 0) {
         const relPath = relative(projectRoot, fullPath);
@@ -46,7 +64,15 @@ export async function buildRegistry(
 
       const relPath = relative(projectRoot, fullPath);
       for (const [name, value] of passages) {
-        registry.set(`${relPath}:${name}`, value);
+        const key = `${relPath}:${name}`;
+        registry.set(key, value);
+
+        const nestedRefs = passageNestedRefs.get(name) ?? [];
+        if (nestedRefs.length > 0) {
+          templateRegistry.set(key, buildTemplateContent(value.split("\n"), nestedRefs, relPath));
+        } else {
+          templateRegistry.set(key, value);
+        }
       }
     } catch {
       // Skip files that can't be read as text
@@ -54,5 +80,5 @@ export async function buildRegistry(
     }
   }
 
-  return { registry, errors: allErrors };
+  return { registry, templateRegistry, errors: allErrors };
 }

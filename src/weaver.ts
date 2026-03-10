@@ -2,14 +2,15 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { Glob } from "bun";
 import type { ParseError } from "./parser.ts";
-import { parsePassageReferences } from "./parser.ts";
-import type { PassageRegistry, FileErrors } from "./passage-registry.ts";
-import { buildRegistry } from "./passage-registry.ts";
+import { parsePassageReferences, VALID_MODIFIERS } from "./parser.ts";
+import type { PassageRegistry, PassageTemplateRegistry, FileErrors } from "./registries.ts";
+import { buildRegistries } from "./registries.ts";
 import type { SpoolConfig } from "./config.ts";
 
 export function weaveFile(
   docContent: string,
   registry: PassageRegistry,
+  templateRegistry: PassageTemplateRegistry,
 ): { output: string; errors: ParseError[] } {
   const { refs, errors } = parsePassageReferences(docContent);
 
@@ -23,8 +24,17 @@ export function weaveFile(
   });
 
   for (const ref of sortedRefs) {
+    if (ref.modifier !== undefined && !VALID_MODIFIERS.has(ref.modifier)) {
+      errors.push({
+        line: ref.line,
+        column: ref.column,
+        message: `Unknown modifier: ${ref.modifier}`,
+      });
+      continue;
+    }
     const key = `${ref.filePath}:${ref.passageName}`;
-    const passageContent = registry.get(key);
+    const source = ref.modifier === "no-expand-nested" ? templateRegistry : registry;
+    const passageContent = source.get(key);
     if (passageContent === undefined) {
       errors.push({
         line: ref.line,
@@ -50,7 +60,7 @@ export async function weaveProject(
   projectRoot: string,
   config: SpoolConfig,
 ): Promise<WeaveResult> {
-  const { registry, errors: registryErrors } = await buildRegistry(
+  const { registry, templateRegistry, errors: registryErrors } = await buildRegistries(
     projectRoot,
     config,
   );
@@ -66,7 +76,7 @@ export async function weaveProject(
     filesProcessed++;
     const fullPath = join(docsDir, entry);
     const content = await readFile(fullPath, "utf-8");
-    const { output, errors } = weaveFile(content, registry);
+    const { output, errors } = weaveFile(content, registry, templateRegistry);
 
     if (errors.length > 0) {
       const relPath = relative(projectRoot, fullPath);

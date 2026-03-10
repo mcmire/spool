@@ -1,6 +1,6 @@
 import { findProjectRoot, loadConfig } from "../config.ts";
 import { weaveProject } from "../weaver.ts";
-import type { FileErrors } from "../passage-registry.ts";
+import type { FileErrors } from "../registries.ts";
 
 function printErrors(fileErrors: FileErrors[]): void {
   for (const { filePath, errors } of fileErrors) {
