@@ -1,14 +1,14 @@
 {
   "name": "spool",
-  "module": "index.ts",
+  "module": "src/cli.ts",
   "type": "module",
   "private": true,
   "bin": {
-    "spool": "src/index.ts"
+    "spool": "src/cli.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit",
-    "run-tool": "bun run src/index.ts"
+    "run-tool": "bun run src/cli.ts"
   },
   "dependencies": {
     "commander": "^13.1.0",
