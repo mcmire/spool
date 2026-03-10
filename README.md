@@ -26,13 +26,13 @@ export class Car {
 ## The Car Class
 
 ~~~ts
-{{src/car.ts:car-class}}
+::spool:: {{src/car.ts:car-class}}
 ~~~
 ```
 
 **3. Run `spool weave` to produce the final docs.**
 
-Blocks are referenced by `{{relativePath:blockName}}` where the path is relative to the project root. Blocks can be nested — content lines are added to all currently-open blocks on the stack.
+Blocks are referenced by `::spool:: {{relativePath:blockName}}` where the path is relative to the project root. Any comment characters before `::spool::` are ignored, so `//::spool:: {{...}}`, `# ::spool:: {{...}}`, etc. all work. Blocks can be nested — content lines are added to all currently-open blocks on the stack.
 
 ## Setup
 

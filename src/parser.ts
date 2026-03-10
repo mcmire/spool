@@ -13,7 +13,7 @@ export type DocReference = {
 };
 
 const SOURCE_ANNOTATION_RE = /^(.*?)::spool::\s*<(\/?)([\w-]+)>\s*$/;
-const DOC_REFERENCE_RE = /\{\{(.+?):([\w-]+)\}\}/g;
+const DOC_REFERENCE_RE = /^.*?::spool::\s*\{\{(.+?):([\w-]+)\}\}/;
 
 export function parseSourceBlocks(content: string): {
   blocks: Map<string, string>;
@@ -86,15 +86,15 @@ export function parseDocReferences(content: string): {
   const lines = content.split("\n");
 
   for (let i = 0; i < lines.length; i++) {
-    let match: RegExpExecArray | null;
-    DOC_REFERENCE_RE.lastIndex = 0;
-    while ((match = DOC_REFERENCE_RE.exec(lines[i]!)) !== null) {
+    const match = DOC_REFERENCE_RE.exec(lines[i]!);
+    if (match) {
+      const raw = `{{${match[1]!}:${match[2]!}}}`;
       refs.push({
         filePath: match[1]!,
         blockName: match[2]!,
         line: i + 1,
-        column: match.index + 1,
-        raw: match[0]!,
+        column: match[0]!.indexOf("{{") + 1,
+        raw,
       });
     }
   }
