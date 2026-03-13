@@ -22,13 +22,13 @@ export class Car {
 
 **2. Reference passages in your doc templates:**
 
-```md
+````md
 ## The Car Class
 
-~~~ts
+```ts
 // <<@SPOOL: src/car.ts#car>>
-~~~
 ```
+````
 
 **3. Run `spool weave` to produce the final docs.**
 
@@ -46,11 +46,11 @@ Create a `spool.json` at your project root:
 }
 ```
 
-| Field | Description |
-|---|---|
+| Field           | Description                                  |
+| --------------- | -------------------------------------------- |
 | `sourceCodeDir` | Directory scanned for annotated source files |
-| `sourceDocsDir` | Directory containing `.md` doc templates |
-| `targetDocsDir` | Directory where woven output is written |
+| `sourceDocsDir` | Directory containing `.md` doc templates     |
+| `targetDocsDir` | Directory where woven output is written      |
 
 `sourceDocsDir` may be inside `sourceCodeDir` — spool skips it when scanning for annotations.
 
@@ -89,9 +89,9 @@ spool preview
 spool preview --port 8080
 ```
 
-| Option | Default | Description |
-|---|---|---|
-| `-p, --port <port>` | `4567` | Port for the preview server |
+| Option              | Default | Description                 |
+| ------------------- | ------- | --------------------------- |
+| `-p, --port <port>` | `4567`  | Port for the preview server |
 
 ### `spool lsp`
 

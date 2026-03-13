@@ -4,10 +4,7 @@ import {
   ProposedFeatures,
   TextDocumentSyncKind,
 } from "vscode-languageserver/node.js";
-import type {
-  InitializeResult,
-  Diagnostic,
-} from "vscode-languageserver/node.js";
+import type { InitializeResult, Diagnostic } from "vscode-languageserver/node.js";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";

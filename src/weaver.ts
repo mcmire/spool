@@ -48,14 +48,12 @@ export type WeaveResult = {
   weaveErrors: FileErrors[];
 };
 
-export async function weaveProject(
-  projectRoot: string,
-  config: SpoolConfig,
-): Promise<WeaveResult> {
-  const { registry, templateRegistry, errors: registryErrors } = await buildRegistries(
-    projectRoot,
-    config,
-  );
+export async function weaveProject(projectRoot: string, config: SpoolConfig): Promise<WeaveResult> {
+  const {
+    registry,
+    templateRegistry,
+    errors: registryErrors,
+  } = await buildRegistries(projectRoot, config);
 
   const docsDir = join(projectRoot, config.sourceDocsDir);
   const targetDir = join(projectRoot, config.targetDocsDir);

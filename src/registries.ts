@@ -13,11 +13,7 @@ export type FileErrors = {
   errors: ParseError[];
 };
 
-function buildTemplateContent(
-  lines: string[],
-  nestedRefs: NestedRef[],
-  relPath: string,
-): string {
+function buildTemplateContent(lines: string[], nestedRefs: NestedRef[], relPath: string): string {
   const result: string[] = [];
   let i = 0;
   for (const nested of nestedRefs) {
@@ -32,7 +28,11 @@ function buildTemplateContent(
 export async function buildRegistries(
   projectRoot: string,
   config: SpoolConfig,
-): Promise<{ registry: PassageRegistry; templateRegistry: PassageTemplateRegistry; errors: FileErrors[] }> {
+): Promise<{
+  registry: PassageRegistry;
+  templateRegistry: PassageTemplateRegistry;
+  errors: FileErrors[];
+}> {
   const registry: PassageRegistry = new Map();
   const templateRegistry: PassageTemplateRegistry = new Map();
   const allErrors: FileErrors[] = [];

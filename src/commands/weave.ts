@@ -16,12 +16,9 @@ function printErrors(fileErrors: FileErrors[]): void {
 async function runWeave(projectRoot: string, config: SpoolConfig): Promise<boolean> {
   const result = await weaveProject(projectRoot, config);
 
-  console.log(
-    `Wove ${result.filesProcessed} doc file(s), wrote ${result.filesWritten} output(s).`,
-  );
+  console.log(`Wove ${result.filesProcessed} doc file(s), wrote ${result.filesWritten} output(s).`);
 
-  const hasErrors =
-    result.registryErrors.length > 0 || result.weaveErrors.length > 0;
+  const hasErrors = result.registryErrors.length > 0 || result.weaveErrors.length > 0;
 
   if (result.registryErrors.length > 0) {
     console.error("\nSource file errors:");

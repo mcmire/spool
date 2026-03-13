@@ -33,9 +33,7 @@ ${body}
 </html>`;
 }
 
-export async function previewCommand(
-  options: { port?: string },
-): Promise<void> {
+export async function previewCommand(options: { port?: string }): Promise<void> {
   const projectRoot = findProjectRoot(process.cwd());
   const config = await loadConfig(projectRoot);
 

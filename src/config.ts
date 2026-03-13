@@ -18,9 +18,7 @@ export function findProjectRoot(startDir: string): string {
     }
     const parent = dirname(dir);
     if (parent === dir) {
-      throw new Error(
-        `Could not find ${CONFIG_FILE} in ${startDir} or any parent directory`,
-      );
+      throw new Error(`Could not find ${CONFIG_FILE} in ${startDir} or any parent directory`);
     }
     dir = parent;
   }

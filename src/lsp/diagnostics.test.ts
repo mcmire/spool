@@ -1,30 +1,18 @@
 import { test, expect, describe } from "bun:test";
 import { DiagnosticSeverity } from "vscode-languageserver/node.js";
-import {
-  getSourceFileDiagnostics,
-  getDocFileDiagnostics,
-} from "./diagnostics.ts";
-import type {
-  PassageRegistry,
-  PassageTemplateRegistry,
-} from "../registries.ts";
+import { getSourceFileDiagnostics, getDocFileDiagnostics } from "./diagnostics.ts";
+import type { PassageRegistry, PassageTemplateRegistry } from "../registries.ts";
 
 describe("getSourceFileDiagnostics", () => {
   describe("valid source", () => {
     test("no annotations returns no diagnostics", () => {
-      const diagnostics = getSourceFileDiagnostics(
-        "just normal code\nmore code",
-      );
+      const diagnostics = getSourceFileDiagnostics("just normal code\nmore code");
       expect(diagnostics).toEqual([]);
     });
 
     test("valid passage returns no diagnostics", () => {
       const diagnostics = getSourceFileDiagnostics(
-        [
-          "// @SPOOL(start): #car",
-          "export class Car {}",
-          "// @SPOOL(end): #car",
-        ].join("\n"),
+        ["// @SPOOL(start): #car", "export class Car {}", "// @SPOOL(end): #car"].join("\n"),
       );
       expect(diagnostics).toEqual([]);
     });
@@ -32,9 +20,7 @@ describe("getSourceFileDiagnostics", () => {
 
   describe("invalid source", () => {
     test("malformed annotation produces diagnostic with correct range", () => {
-      const diagnostics = getSourceFileDiagnostics(
-        ["// @SPOOL(foo): #car"].join("\n"),
-      );
+      const diagnostics = getSourceFileDiagnostics(["// @SPOOL(foo): #car"].join("\n"));
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
@@ -49,9 +35,7 @@ describe("getSourceFileDiagnostics", () => {
     });
 
     test("unclosed passage produces diagnostic with zero-length range", () => {
-      const diagnostics = getSourceFileDiagnostics(
-        ["// @SPOOL(start): #car", "code"].join("\n"),
-      );
+      const diagnostics = getSourceFileDiagnostics(["// @SPOOL(start): #car", "code"].join("\n"));
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
@@ -87,9 +71,7 @@ describe("getSourceFileDiagnostics", () => {
 describe("getDocFileDiagnostics", () => {
   describe("valid references", () => {
     test("reference found in registry returns no diagnostics", () => {
-      const registry: PassageRegistry = new Map([
-        ["src/car.ts:car", "export class Car {}"],
-      ]);
+      const registry: PassageRegistry = new Map([["src/car.ts:car", "export class Car {}"]]);
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
         ["// <<@SPOOL: src/car.ts#car>>"].join("\n"),
@@ -101,9 +83,7 @@ describe("getDocFileDiagnostics", () => {
 
     test("no-expand-nested found in templateRegistry returns no diagnostics", () => {
       const registry: PassageRegistry = new Map();
-      const templateRegistry: PassageTemplateRegistry = new Map([
-        ["src/car.ts:car", "code"],
-      ]);
+      const templateRegistry: PassageTemplateRegistry = new Map([["src/car.ts:car", "code"]]);
       const diagnostics = getDocFileDiagnostics(
         ["// <<@SPOOL: src/car.ts#car:no-expand-nested>>"].join("\n"),
         registry,
@@ -171,8 +151,7 @@ describe("getDocFileDiagnostics", () => {
             start: { line: 0, character: 3 },
             end: { line: 0, character: 46 },
           },
-          message:
-            "Unknown reference: <<@SPOOL: src/car.ts#car:no-expand-nested>>",
+          message: "Unknown reference: <<@SPOOL: src/car.ts#car:no-expand-nested>>",
           source: "spool",
         },
       ]);

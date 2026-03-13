@@ -17,10 +17,7 @@ function printErrors(fileErrors: FileErrors[]): void {
 export async function lintCommand(): Promise<void> {
   const projectRoot = findProjectRoot(process.cwd());
   const config = await loadConfig(projectRoot);
-  const { registry, errors: registryErrors } = await buildRegistries(
-    projectRoot,
-    config,
-  );
+  const { registry, errors: registryErrors } = await buildRegistries(projectRoot, config);
 
   const docErrors: FileErrors[] = [];
   const docsDir = join(projectRoot, config.sourceDocsDir);

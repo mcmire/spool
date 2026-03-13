@@ -25,8 +25,7 @@ type Frame = { name: string; lines: string[]; nestedRefs: NestedRef[] };
 
 export const VALID_MODIFIERS = new Set(["no-expand-nested"]);
 
-const SOURCE_ANNOTATION_RE =
-  /^(.*?)(?:==\s*)?@SPOOL\((start|end)\):\s*#([\w-]+)(?:\s*==)?\s*$/;
+const SOURCE_ANNOTATION_RE = /^(.*?)(?:==\s*)?@SPOOL\((start|end)\):\s*#([\w-]+)(?:\s*==)?\s*$/;
 const SOURCE_DIRECTIVE_RE = /^.*?@SPOOL\((\w+)\)/;
 const PASSAGE_REFERENCE_RE = /^.*?<<@SPOOL:\s*(.+?)#([\w-]+)(?::([\w-]+))?>>/;
 
@@ -39,14 +38,12 @@ function magicCommentError(line: string, lineNum: number): ParseError {
       line: lineNum,
       column: col,
       length: "@SPOOL".length,
-      message:
-        "Expected line to match '@SPOOL(start): #name' or '@SPOOL(end): #name'",
+      message: "Expected line to match '@SPOOL(start): #name' or '@SPOOL(end): #name'",
     };
   }
 
   const directive = directiveMatch[1]!;
-  const directiveLength =
-    directiveMatch[0]!.length - directiveMatch[0]!.indexOf("@SPOOL");
+  const directiveLength = directiveMatch[0]!.length - directiveMatch[0]!.indexOf("@SPOOL");
 
   if (directive !== "start" && directive !== "end") {
     return {
@@ -107,8 +104,7 @@ export function parseSourcePassages(content: string): {
           passageNestedRefs.set(passageName, closed.nestedRefs);
           if (stack.length > 0) {
             const parent = stack[stack.length - 1]!;
-            parent.nestedRefs[parent.nestedRefs.length - 1]!.endIdx =
-              parent.lines.length;
+            parent.nestedRefs[parent.nestedRefs.length - 1]!.endIdx = parent.lines.length;
           }
         }
       } else {
