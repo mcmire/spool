@@ -46,8 +46,8 @@ export async function weaveCommand(options: { watch?: boolean }): Promise<void> 
     return;
   }
 
-  const sourceDir = join(projectRoot, config.sourceCodeDir);
-  const docsDir = join(projectRoot, config.sourceDocsDir);
+  const sourceDir = join(projectRoot, config.source.code);
+  const docsDir = join(projectRoot, config.source.docs);
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 

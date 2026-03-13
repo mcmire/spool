@@ -20,7 +20,7 @@ export async function lintCommand(): Promise<void> {
   const { registry, errors: registryErrors } = await buildRegistries(projectRoot, config);
 
   const docErrors: FileErrors[] = [];
-  const docsDir = join(projectRoot, config.sourceDocsDir);
+  const docsDir = join(projectRoot, config.source.docs);
 
   const glob = new Glob("**/*.md");
   for await (const entry of glob.scan({ cwd: docsDir })) {

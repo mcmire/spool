@@ -55,8 +55,8 @@ export async function weaveProject(projectRoot: string, config: SpoolConfig): Pr
     errors: registryErrors,
   } = await buildRegistries(projectRoot, config);
 
-  const docsDir = join(projectRoot, config.sourceDocsDir);
-  const targetDir = join(projectRoot, config.targetDocsDir);
+  const docsDir = join(projectRoot, config.source.docs);
+  const targetDir = join(projectRoot, config.target);
   const weaveErrors: FileErrors[] = [];
   let filesProcessed = 0;
   let filesWritten = 0;

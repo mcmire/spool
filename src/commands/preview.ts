@@ -41,7 +41,7 @@ export async function previewCommand(options: { port?: string }): Promise<void> 
   const result = await weaveProject(projectRoot, config);
   console.log(`Initial weave: ${result.filesWritten} file(s) written.`);
 
-  const targetDir = join(projectRoot, config.targetDocsDir);
+  const targetDir = join(projectRoot, config.target);
   const port = options.port ? parseInt(options.port, 10) : 4567;
 
   const server = Bun.serve({
@@ -75,8 +75,8 @@ export async function previewCommand(options: { port?: string }): Promise<void> 
   console.log(`Preview server running at http://localhost:${server.port}`);
 
   // Watch for changes
-  const sourceDir = join(projectRoot, config.sourceCodeDir);
-  const docsDir = join(projectRoot, config.sourceDocsDir);
+  const sourceDir = join(projectRoot, config.source.code);
+  const docsDir = join(projectRoot, config.source.docs);
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 

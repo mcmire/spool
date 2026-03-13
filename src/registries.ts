@@ -36,10 +36,10 @@ export async function buildRegistries(
   const registry: PassageRegistry = new Map();
   const templateRegistry: PassageTemplateRegistry = new Map();
   const allErrors: FileErrors[] = [];
-  const sourceDir = join(projectRoot, config.sourceCodeDir);
-  const docsDir = join(projectRoot, config.sourceDocsDir);
+  const sourceDir = join(projectRoot, config.source.code);
+  const docsDir = join(projectRoot, config.source.docs);
 
-  const excludeGlobs = (config.excludePatterns ?? []).map((p) => new Glob(p));
+  const excludeGlobs = (config.source.excludeFromCode ?? []).map((p) => new Glob(p));
 
   const glob = new Glob("**/*");
   for await (const entry of glob.scan({ cwd: sourceDir, dot: false })) {

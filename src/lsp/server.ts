@@ -79,8 +79,8 @@ export function startServer(): void {
     if (!projectRoot || !config) {
       return false;
     }
-    const sourceDir = join(projectRoot, config.sourceCodeDir);
-    const docsDir = join(projectRoot, config.sourceDocsDir);
+    const sourceDir = join(projectRoot, config.source.code);
+    const docsDir = join(projectRoot, config.source.docs);
     return filePath.startsWith(sourceDir) && !filePath.startsWith(docsDir);
   }
 
@@ -88,7 +88,7 @@ export function startServer(): void {
     if (!projectRoot || !config) {
       return false;
     }
-    const docsDir = join(projectRoot, config.sourceDocsDir);
+    const docsDir = join(projectRoot, config.source.docs);
     return filePath.startsWith(docsDir) && filePath.endsWith(".md");
   }
 

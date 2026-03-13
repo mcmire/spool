@@ -3,9 +3,12 @@ import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 export type SpoolConfig = {
-  sourceCodeDir: string;
-  sourceDocsDir: string;
-  targetDocsDir: string;
+  source: {
+    code: string;
+    docs: string;
+    excludeFromCode?: string[];
+  };
+  target: string;
 };
 
 const CONFIG_FILE = "spool.json";
@@ -29,18 +32,35 @@ export async function loadConfig(projectRoot: string): Promise<SpoolConfig> {
   const raw = await readFile(configPath, "utf-8");
   const parsed = JSON.parse(raw) as Record<string, unknown>;
 
-  for (const field of ["sourceCodeDir", "sourceDocsDir", "targetDocsDir"]) {
-    if (typeof parsed[field] !== "string") {
-      throw new Error(`Missing or invalid field "${field}" in ${CONFIG_FILE}`);
+  const source = parsed.source as Record<string, unknown> | undefined;
+  const code = source?.code;
+  const docs = source?.docs;
+  const target = parsed.target;
+
+  if (!source || typeof docs !== "string" || typeof target !== "string") {
+    throw new Error(`Missing or invalid fields in ${CONFIG_FILE}`);
+  }
+
+  let sourceCodeDir: string;
+  let excludeFromCode: string[] | undefined;
+
+  if (typeof code === "string") {
+    sourceCodeDir = code;
+  } else if (Array.isArray(code) && code.length > 0 && typeof code[0] === "string") {
+    sourceCodeDir = code[0];
+    const patterns = (code as string[])
+      .slice(1)
+      .filter((e) => e.startsWith("!"))
+      .map((e) => e.slice(1));
+    if (patterns.length > 0) {
+      excludeFromCode = patterns;
     }
+  } else {
+    throw new Error(`Missing or invalid "source.code" in ${CONFIG_FILE}`);
   }
 
   return {
-    sourceCodeDir: parsed.sourceCodeDir as string,
-    sourceDocsDir: parsed.sourceDocsDir as string,
-    targetDocsDir: parsed.targetDocsDir as string,
-    excludePatterns: Array.isArray(parsed.excludePatterns)
-      ? (parsed.excludePatterns as string[])
-      : undefined,
+    source: { code: sourceCodeDir, docs, excludeFromCode },
+    target,
   };
 }
