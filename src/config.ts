@@ -39,5 +39,8 @@ export async function loadConfig(projectRoot: string): Promise<SpoolConfig> {
     sourceCodeDir: parsed.sourceCodeDir as string,
     sourceDocsDir: parsed.sourceDocsDir as string,
     targetDocsDir: parsed.targetDocsDir as string,
+    excludePatterns: Array.isArray(parsed.excludePatterns)
+      ? (parsed.excludePatterns as string[])
+      : undefined,
   };
 }

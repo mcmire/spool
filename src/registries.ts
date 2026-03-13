@@ -39,12 +39,20 @@ export async function buildRegistries(
   const sourceDir = join(projectRoot, config.sourceCodeDir);
   const docsDir = join(projectRoot, config.sourceDocsDir);
 
+  const excludeGlobs = (config.excludePatterns ?? []).map((p) => new Glob(p));
+
   const glob = new Glob("**/*");
   for await (const entry of glob.scan({ cwd: sourceDir, dot: false })) {
     const fullPath = join(sourceDir, entry);
+    const relPath = relative(projectRoot, fullPath);
 
     // Skip sourceDocsDir
     if (fullPath.startsWith(docsDir)) {
+      continue;
+    }
+
+    // Skip excluded patterns
+    if (excludeGlobs.some((g) => g.match(relPath))) {
       continue;
     }
 
@@ -58,11 +66,8 @@ export async function buildRegistries(
       const { passages, passageNestedRefs, errors } = parseSourcePassages(content);
 
       if (errors.length > 0) {
-        const relPath = relative(projectRoot, fullPath);
         allErrors.push({ filePath: relPath, errors });
       }
-
-      const relPath = relative(projectRoot, fullPath);
       for (const [name, value] of passages) {
         const key = `${relPath}:${name}`;
         registry.set(key, value);
