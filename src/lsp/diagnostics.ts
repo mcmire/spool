@@ -23,6 +23,19 @@ export function getSourceFileDiagnostics(content: string): Diagnostic[] {
   return diagnostics;
 }
 
+function fileExistsInRegistry(
+  filePath: string,
+  source: PassageRegistry | PassageTemplateRegistry,
+): boolean {
+  const prefix = `${filePath}:`;
+  for (const key of source.keys()) {
+    if (key.startsWith(prefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function getDocFileDiagnostics(
   content: string,
   registry: PassageRegistry,
@@ -65,6 +78,9 @@ export function getDocFileDiagnostics(
     const key = `${ref.filePath}:${ref.passageName}`;
     const source = ref.modifier === "no-expand-nested" ? templateRegistry : registry;
     if (!source.has(key)) {
+      const message = fileExistsInRegistry(ref.filePath, source)
+        ? `Unknown passage ID "${ref.passageName}" in file ${ref.filePath}`
+        : `Unknown file: ${ref.filePath}`;
       diagnostics.push({
         severity: DiagnosticSeverity.Error,
         range: {
@@ -74,7 +90,7 @@ export function getDocFileDiagnostics(
             character: ref.column - 1 + ref.raw.length,
           },
         },
-        message: `Unknown reference: ${ref.raw}`,
+        message,
         source: "spool",
       });
     }

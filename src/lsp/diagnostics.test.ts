@@ -94,7 +94,7 @@ describe("getDocFileDiagnostics", () => {
   });
 
   describe("invalid references", () => {
-    test("reference not found in registry produces diagnostic", () => {
+    test("file not in registry produces 'Unknown file' diagnostic", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
@@ -109,7 +109,28 @@ describe("getDocFileDiagnostics", () => {
             start: { line: 0, character: 3 },
             end: { line: 0, character: 29 },
           },
-          message: "Unknown reference: <<@SPOOL: src/car.ts#car>>",
+          message: "Unknown file: src/car.ts",
+          source: "spool",
+        },
+      ]);
+    });
+
+    test("file in registry but passage missing produces 'Unknown passage ID' diagnostic", () => {
+      const registry: PassageRegistry = new Map([["src/car.ts:boat", "code"]]);
+      const templateRegistry: PassageTemplateRegistry = new Map();
+      const diagnostics = getDocFileDiagnostics(
+        ["// <<@SPOOL: src/car.ts#car>>"].join("\n"),
+        registry,
+        templateRegistry,
+      );
+      expect(diagnostics).toEqual([
+        {
+          severity: DiagnosticSeverity.Error,
+          range: {
+            start: { line: 0, character: 3 },
+            end: { line: 0, character: 29 },
+          },
+          message: 'Unknown passage ID "car" in file src/car.ts',
           source: "spool",
         },
       ]);
@@ -136,7 +157,7 @@ describe("getDocFileDiagnostics", () => {
       ]);
     });
 
-    test("no-expand-nested not found in templateRegistry produces diagnostic", () => {
+    test("no-expand-nested with file not in templateRegistry produces 'Unknown file' diagnostic", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
@@ -151,7 +172,7 @@ describe("getDocFileDiagnostics", () => {
             start: { line: 0, character: 3 },
             end: { line: 0, character: 46 },
           },
-          message: "Unknown reference: <<@SPOOL: src/car.ts#car:no-expand-nested>>",
+          message: "Unknown file: src/car.ts",
           source: "spool",
         },
       ]);
@@ -193,7 +214,7 @@ describe("getDocFileDiagnostics", () => {
             start: { line: 1, character: 3 },
             end: { line: 1, character: 29 },
           },
-          message: "Unknown reference: <<@SPOOL: src/car.ts#car>>",
+          message: "Unknown file: src/car.ts",
           source: "spool",
         },
       ]);
