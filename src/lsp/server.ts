@@ -6,7 +6,8 @@ import {
 } from "vscode-languageserver/node.js";
 import type { InitializeResult, Diagnostic } from "vscode-languageserver/node.js";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { join } from "node:path";
+import { Glob } from "bun";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findProjectRoot, loadConfig } from "../config.ts";
 import type { SpoolConfig } from "../config.ts";
@@ -81,7 +82,12 @@ export function startServer(): void {
     }
     const sourceDir = join(projectRoot, config.source.code);
     const docsDir = join(projectRoot, config.source.docs);
-    return filePath.startsWith(sourceDir) && !filePath.startsWith(docsDir);
+    if (!filePath.startsWith(sourceDir) || filePath.startsWith(docsDir)) {
+      return false;
+    }
+    const relPath = relative(projectRoot, filePath);
+    const excludeGlobs = (config.source.excludeFromCode ?? []).map((p) => new Glob(p));
+    return !excludeGlobs.some((g) => g.match(relPath));
   }
 
   function isDocFile(filePath: string): boolean {
