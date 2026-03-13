@@ -110,14 +110,25 @@ export function startServer(): void {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: error.line - 1, character: error.column - 1 },
-            end: { line: error.line - 1, character: error.column - 1 },
+            end: { line: error.line - 1, character: error.column - 1 + (error.length ?? 0) },
           },
           message: error.message,
           source: "spool",
         });
       }
     } else if (isDocFile(filePath)) {
-      const { refs } = parsePassageReferences(content);
+      const { refs, errors: refErrors } = parsePassageReferences(content);
+      for (const error of refErrors) {
+        diagnostics.push({
+          severity: DiagnosticSeverity.Error,
+          range: {
+            start: { line: error.line - 1, character: error.column - 1 },
+            end: { line: error.line - 1, character: error.column - 1 + (error.length ?? 0) },
+          },
+          message: error.message,
+          source: "spool",
+        });
+      }
       for (const ref of refs) {
         if (ref.modifier !== undefined && !VALID_MODIFIERS.has(ref.modifier)) {
           diagnostics.push({

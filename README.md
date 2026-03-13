@@ -11,13 +11,13 @@ The annotation syntax is language-agnostic — it works with any comment style (
 **1. Annotate your source code:**
 
 ```ts
-//::spool:: <car-class>
+// == @SPOOL(start): #car ==
 export class Car {
   drive() {
     console.log("vroom");
   }
 }
-//::spool:: </car-class>
+// == @SPOOL(end): #car ==
 ```
 
 **2. Reference passages in your doc templates:**
@@ -26,13 +26,13 @@ export class Car {
 ## The Car Class
 
 ~~~ts
-::spool:: {{src/car.ts:car-class}}
+// <<@SPOOL: src/car.ts#car>>
 ~~~
 ```
 
 **3. Run `spool weave` to produce the final docs.**
 
-Passages are referenced by `::spool:: {{relativePath:passageName}}` where the path is relative to the project root. Any comment characters before `::spool::` are ignored, so `//::spool:: {{...}}`, `# ::spool:: {{...}}`, etc. all work. Passages can be nested — content lines are added to all currently-open passages on the stack.
+Passages are referenced by `<<@SPOOL: relativePath#passageName>>` where the path is relative to the project root. Any comment characters before `<<@SPOOL:` are ignored, so `// <<@SPOOL: ...>>`, `# <<@SPOOL: ...>>`, etc. all work. Passages can be nested — content lines are added to all currently-open passages on the stack.
 
 ## Setup
 

@@ -1,6 +1,7 @@
 export type ParseError = {
   line: number;
   column: number;
+  length?: number;
   message: string;
 };
 
@@ -24,8 +25,48 @@ type Frame = { name: string; lines: string[]; nestedRefs: NestedRef[] };
 
 export const VALID_MODIFIERS = new Set(["no-expand-nested"]);
 
-const SOURCE_ANNOTATION_RE = /^(.*?)::spool::\s*<(\/?)([\w-]+)>\s*$/;
-const PASSAGE_REFERENCE_RE = /^.*?::spool::\s*\{\{(.+?):([\w-]+)(?::([\w-]+))?\}\}/;
+const SOURCE_ANNOTATION_RE =
+  /^(.*?)(?:==\s*)?@SPOOL\((start|end)\):\s*#([\w-]+)(?:\s*==)?\s*$/;
+const SOURCE_DIRECTIVE_RE = /^.*?@SPOOL\((\w+)\)/;
+const PASSAGE_REFERENCE_RE = /^.*?<<@SPOOL:\s*(.+?)#([\w-]+)(?::([\w-]+))?>>/;
+
+function magicCommentError(line: string, lineNum: number): ParseError {
+  const col = line.indexOf("@SPOOL") + 1;
+  const directiveMatch = SOURCE_DIRECTIVE_RE.exec(line);
+
+  if (!directiveMatch) {
+    return {
+      line: lineNum,
+      column: col,
+      length: "@SPOOL".length,
+      message:
+        "Expected line to match '@SPOOL(start): #name' or '@SPOOL(end): #name'",
+    };
+  }
+
+  const directive = directiveMatch[1]!;
+  const directiveLength =
+    directiveMatch[0]!.length - directiveMatch[0]!.indexOf("@SPOOL");
+
+  if (directive !== "start" && directive !== "end") {
+    return {
+      line: lineNum,
+      column: col,
+      length: directiveLength,
+      message: `Expected directive 'start' or 'end', got '${directive}'`,
+    };
+  }
+
+  const hasColon = /^.*?@SPOOL\((start|end)\)\s*:/.test(line);
+  return {
+    line: lineNum,
+    column: col,
+    length: directiveLength,
+    message: hasColon
+      ? "Expected identifier ('#' followed by name)"
+      : "Expected line to match '@SPOOL(start): #name' or '@SPOOL(end): #name'",
+  };
+}
 
 export function parseSourcePassages(content: string): {
   passages: Map<string, string>;
@@ -43,21 +84,22 @@ export function parseSourcePassages(content: string): {
     const match = SOURCE_ANNOTATION_RE.exec(line);
 
     if (match) {
-      const isClosing = match[2]! === "/";
+      const isClosing = match[2]! === "end";
       const passageName = match[3]!;
+      const prefix = match[1]!;
 
       if (isClosing) {
         if (stack.length === 0) {
           errors.push({
             line: i + 1,
             column: 1,
-            message: `Closing passage </${passageName}> without matching open`,
+            message: `Closing passage "${passageName}" without matching open`,
           });
         } else if (stack[stack.length - 1]!.name !== passageName) {
           errors.push({
             line: i + 1,
             column: 1,
-            message: `Mismatched close: expected </${stack[stack.length - 1]!.name}>, got </${passageName}>`,
+            message: `Mismatched close: expected "${stack[stack.length - 1]!.name}", got "${passageName}"`,
           });
         } else {
           const closed = stack.pop()!;
@@ -65,7 +107,8 @@ export function parseSourcePassages(content: string): {
           passageNestedRefs.set(passageName, closed.nestedRefs);
           if (stack.length > 0) {
             const parent = stack[stack.length - 1]!;
-            parent.nestedRefs[parent.nestedRefs.length - 1]!.endIdx = parent.lines.length;
+            parent.nestedRefs[parent.nestedRefs.length - 1]!.endIdx =
+              parent.lines.length;
           }
         }
       } else {
@@ -78,10 +121,17 @@ export function parseSourcePassages(content: string): {
         }
         if (stack.length > 0) {
           const parent = stack[stack.length - 1]!;
-          parent.nestedRefs.push({ name: passageName, prefix: match[1]!, startIdx: parent.lines.length, endIdx: -1 });
+          parent.nestedRefs.push({
+            name: passageName,
+            prefix,
+            startIdx: parent.lines.length,
+            endIdx: -1,
+          });
         }
         stack.push({ name: passageName, lines: [], nestedRefs: [] });
       }
+    } else if (line.includes("@SPOOL")) {
+      errors.push(magicCommentError(line, i + 1));
     } else {
       for (const frame of stack) {
         frame.lines.push(line);
@@ -93,11 +143,23 @@ export function parseSourcePassages(content: string): {
     errors.push({
       line: 1,
       column: 1,
-      message: `Unclosed passage <${frame.name}>`,
+      message: `Unclosed passage "${frame.name}"`,
     });
   }
 
   return { passages, passageNestedRefs, errors };
+}
+
+function malformedReferenceError(line: string, lineNum: number): ParseError {
+  const col = line.indexOf("<<@SPOOL") + 1;
+  const closeIdx = line.indexOf(">>", col - 1);
+  const length = closeIdx >= 0 ? closeIdx + 2 - (col - 1) : "<<@SPOOL".length;
+  return {
+    line: lineNum,
+    column: col,
+    length,
+    message: "Expected reference to match '@SPOOL: file-path#passage-id'",
+  };
 }
 
 export function parsePassageReferences(content: string): {
@@ -113,16 +175,18 @@ export function parsePassageReferences(content: string): {
     if (match) {
       const modifier = match[3];
       const raw = modifier
-        ? `{{${match[1]!}:${match[2]!}:${modifier}}}`
-        : `{{${match[1]!}:${match[2]!}}}`;
+        ? `<<@SPOOL: ${match[1]!}#${match[2]!}:${modifier}>>`
+        : `<<@SPOOL: ${match[1]!}#${match[2]!}>>`;
       refs.push({
         filePath: match[1]!,
         passageName: match[2]!,
         modifier,
         line: i + 1,
-        column: match[0]!.indexOf("{{") + 1,
+        column: match[0]!.indexOf("<<") + 1,
         raw,
       });
+    } else if (lines[i]!.includes("<<@SPOOL")) {
+      errors.push(malformedReferenceError(lines[i]!, i + 1));
     }
   }
 
