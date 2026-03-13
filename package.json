@@ -1,5 +1,6 @@
 {
   "name": "spool",
+  "version": "0.0.0-dev",
   "private": true,
   "bin": {
     "spool": "dist/cli.js"

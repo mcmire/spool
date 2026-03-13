@@ -13,6 +13,7 @@ import type { SpoolConfig } from "../config.ts";
 import { buildRegistries } from "../registries.ts";
 import type { PassageRegistry, PassageTemplateRegistry } from "../registries.ts";
 import { getSourceFileDiagnostics, getDocFileDiagnostics } from "./diagnostics.ts";
+import { version } from "../../package.json" with { type: "json" };
 
 export function startServer(): void {
   const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
@@ -32,6 +33,7 @@ export function startServer(): void {
       capabilities: {
         textDocumentSync: TextDocumentSyncKind.Full,
       },
+      serverInfo: { name: "spool", version },
     };
   });
 
