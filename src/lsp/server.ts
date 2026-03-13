@@ -3,7 +3,6 @@ import {
   TextDocuments,
   ProposedFeatures,
   TextDocumentSyncKind,
-  DiagnosticSeverity,
 } from "vscode-languageserver/node.js";
 import type {
   InitializeResult,
@@ -14,9 +13,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findProjectRoot, loadConfig } from "../config.ts";
 import type { SpoolConfig } from "../config.ts";
-import { parseSourcePassages, parsePassageReferences, VALID_MODIFIERS } from "../parser.ts";
 import { buildRegistries } from "../registries.ts";
 import type { PassageRegistry, PassageTemplateRegistry } from "../registries.ts";
+import { getSourceFileDiagnostics, getDocFileDiagnostics } from "./diagnostics.ts";
 
 export function startServer(): void {
   const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
@@ -94,76 +93,23 @@ export function startServer(): void {
     return filePath.startsWith(docsDir) && filePath.endsWith(".md");
   }
 
+  function getDiagnostics(filePath: string, content: string): Diagnostic[] {
+    if (isSourceFile(filePath)) {
+      return getSourceFileDiagnostics(content);
+    } else if (isDocFile(filePath)) {
+      return getDocFileDiagnostics(content, registry, templateRegistry);
+    } else {
+      return [];
+    }
+  }
+
   function validateDocument(document: TextDocument): void {
     const filePath = getFilePath(document.uri);
     if (!filePath || !projectRoot || !config) {
       return;
     }
 
-    const diagnostics: Diagnostic[] = [];
-    const content = document.getText();
-
-    if (isSourceFile(filePath)) {
-      const { errors } = parseSourcePassages(content);
-      for (const error of errors) {
-        diagnostics.push({
-          severity: DiagnosticSeverity.Error,
-          range: {
-            start: { line: error.line - 1, character: error.column - 1 },
-            end: { line: error.line - 1, character: error.column - 1 + (error.length ?? 0) },
-          },
-          message: error.message,
-          source: "spool",
-        });
-      }
-    } else if (isDocFile(filePath)) {
-      const { refs, errors: refErrors } = parsePassageReferences(content);
-      for (const error of refErrors) {
-        diagnostics.push({
-          severity: DiagnosticSeverity.Error,
-          range: {
-            start: { line: error.line - 1, character: error.column - 1 },
-            end: { line: error.line - 1, character: error.column - 1 + (error.length ?? 0) },
-          },
-          message: error.message,
-          source: "spool",
-        });
-      }
-      for (const ref of refs) {
-        if (ref.modifier !== undefined && !VALID_MODIFIERS.has(ref.modifier)) {
-          diagnostics.push({
-            severity: DiagnosticSeverity.Error,
-            range: {
-              start: { line: ref.line - 1, character: ref.column - 1 },
-              end: {
-                line: ref.line - 1,
-                character: ref.column - 1 + ref.raw.length,
-              },
-            },
-            message: `Unknown modifier: ${ref.modifier}`,
-            source: "spool",
-          });
-          continue;
-        }
-        const key = `${ref.filePath}:${ref.passageName}`;
-        const source = ref.modifier === "no-expand-nested" ? templateRegistry : registry;
-        if (!source.has(key)) {
-          diagnostics.push({
-            severity: DiagnosticSeverity.Error,
-            range: {
-              start: { line: ref.line - 1, character: ref.column - 1 },
-              end: {
-                line: ref.line - 1,
-                character: ref.column - 1 + ref.raw.length,
-              },
-            },
-            message: `Unknown reference: ${ref.raw}`,
-            source: "spool",
-          });
-        }
-      }
-    }
-
+    const diagnostics = getDiagnostics(filePath, document.getText());
     connection.sendDiagnostics({ uri: document.uri, diagnostics });
   }
 
