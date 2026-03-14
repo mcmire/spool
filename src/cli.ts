@@ -12,7 +12,8 @@ program
   .command("weave")
   .description("Weave source annotations into documentation files")
   .option("-w, --watch", "Watch for changes and re-weave automatically")
-  .action(async (options: { watch?: boolean }) => {
+  .option("-c, --clean", "Clear the target directory before weaving")
+  .action(async (options: { watch?: boolean; clean?: boolean }) => {
     const { weaveCommand } = await import("./commands/weave.ts");
     await weaveCommand(options);
   });

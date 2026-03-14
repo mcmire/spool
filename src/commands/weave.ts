@@ -1,4 +1,5 @@
 import { watch } from "node:fs";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { findProjectRoot, loadConfig } from "../config.ts";
 import type { SpoolConfig } from "../config.ts";
@@ -33,9 +34,14 @@ async function runWeave(projectRoot: string, config: SpoolConfig): Promise<boole
   return hasErrors;
 }
 
-export async function weaveCommand(options: { watch?: boolean }): Promise<void> {
+export async function weaveCommand(options: { watch?: boolean; clean?: boolean }): Promise<void> {
   const projectRoot = findProjectRoot(process.cwd());
   const config = await loadConfig(projectRoot);
+
+  if (options.clean) {
+    const targetDir = join(projectRoot, config.target);
+    await rm(targetDir, { recursive: true, force: true });
+  }
 
   const hasErrors = await runWeave(projectRoot, config);
 
