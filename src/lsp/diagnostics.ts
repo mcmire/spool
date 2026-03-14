@@ -1,5 +1,6 @@
 import { DiagnosticSeverity } from "vscode-languageserver/node.js";
 import type { Diagnostic } from "vscode-languageserver/node.js";
+import { posix } from "node:path";
 import { parseSourcePassages, parsePassageReferences, VALID_MODIFIERS } from "../parser.ts";
 import type { PassageRegistry, PassageTemplateRegistry } from "../registries.ts";
 
@@ -40,6 +41,7 @@ export function getDocFileDiagnostics(
   content: string,
   registry: PassageRegistry,
   templateRegistry: PassageTemplateRegistry,
+  sourceDir: string,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const { refs, errors: refErrors } = parsePassageReferences(content);
@@ -75,12 +77,13 @@ export function getDocFileDiagnostics(
       });
       continue;
     }
-    const key = `${ref.filePath}:${ref.passageName}`;
+    const resolvedFilePath = posix.join(sourceDir, ref.filePath);
+    const key = `${resolvedFilePath}:${ref.passageName}`;
     const source = ref.modifier === "no-expand-nested" ? templateRegistry : registry;
     if (!source.has(key)) {
-      const message = fileExistsInRegistry(ref.filePath, source)
-        ? `Unknown passage ID "${ref.passageName}" in file ${ref.filePath}`
-        : `Unknown file: ${ref.filePath}`;
+      const message = fileExistsInRegistry(resolvedFilePath, source)
+        ? `Unknown passage ID "${ref.passageName}" in file ${resolvedFilePath}`
+        : `Unknown file: ${resolvedFilePath}`;
       diagnostics.push({
         severity: DiagnosticSeverity.Error,
         range: {

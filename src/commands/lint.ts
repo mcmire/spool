@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join, relative, posix } from "node:path";
 import { Glob } from "bun";
 import { findProjectRoot, loadConfig } from "../config.ts";
 import { parsePassageReferences } from "../parser.ts";
@@ -30,7 +30,7 @@ export async function lintCommand(): Promise<void> {
 
     const errors = [];
     for (const ref of refs) {
-      const key = `${ref.filePath}:${ref.passageName}`;
+      const key = `${posix.join(config.source.code, ref.filePath)}:${ref.passageName}`;
       if (!registry.has(key)) {
         errors.push({
           line: ref.line,

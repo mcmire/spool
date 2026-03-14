@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, posix } from "node:path";
 import { Glob } from "bun";
 import type { ParseError } from "./parser.ts";
 import { parsePassageReferences, VALID_MODIFIERS } from "./parser.ts";
@@ -11,6 +11,7 @@ export function weaveFile(
   docContent: string,
   registry: PassageRegistry,
   templateRegistry: PassageTemplateRegistry,
+  sourceDir: string,
 ): { output: string; errors: ParseError[] } {
   const { refs, errors } = parsePassageReferences(docContent);
   const lines = docContent.split("\n");
@@ -24,7 +25,7 @@ export function weaveFile(
       });
       continue;
     }
-    const key = `${ref.filePath}:${ref.passageName}`;
+    const key = `${posix.join(sourceDir, ref.filePath)}:${ref.passageName}`;
     const source = ref.modifier === "no-expand-nested" ? templateRegistry : registry;
     const passageContent = source.get(key);
     if (passageContent === undefined) {
@@ -66,7 +67,7 @@ export async function weaveProject(projectRoot: string, config: SpoolConfig): Pr
     filesProcessed++;
     const fullPath = join(docsDir, entry);
     const content = await readFile(fullPath, "utf-8");
-    const { output, errors } = weaveFile(content, registry, templateRegistry);
+    const { output, errors } = weaveFile(content, registry, templateRegistry, config.source.code);
 
     if (errors.length > 0) {
       const relPath = relative(projectRoot, fullPath);

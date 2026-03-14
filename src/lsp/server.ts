@@ -102,7 +102,7 @@ export function startServer(): void {
     if (isSourceFile(filePath)) {
       return getSourceFileDiagnostics(content);
     } else if (isDocFile(filePath)) {
-      return getDocFileDiagnostics(content, registry, templateRegistry);
+      return getDocFileDiagnostics(content, registry, templateRegistry, config.source.code);
     } else {
       return [];
     }
