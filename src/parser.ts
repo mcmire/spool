@@ -25,28 +25,33 @@ type Frame = { name: string; lines: string[]; nestedRefs: NestedRef[] };
 
 export const VALID_MODIFIERS = new Set(["no-expand-nested"]);
 
-const SOURCE_ANNOTATION_RE = /^(.*?)(?:==\s*)?@SPOOL\((start|end)\):\s*#([\w-]+)(?:\s*==)?\s*$/;
-const SOURCE_DIRECTIVE_RE = /^.*?@SPOOL\((\w+)\)/;
-const SOURCE_IGNORE_RE = /^.*?@SPOOL\((ignore-start|ignore-end|ignore-next)\)\s*$/;
-const PASSAGE_REFERENCE_RE = /^.*?<<@SPOOL:\s*(.+?)#([\w-]+)(?::([\w-]+))?>>/;
+const SOURCE_ANNOTATION_RE = /^(.*?)(?:==\s*)?::SPOOL::\s+(start|end)\(#([\w-]+)\)(?:\s*==)?\s*$/;
+const SOURCE_DIRECTIVE_RE = /^.*?::SPOOL::\s+(\S+)/;
+const SOURCE_IGNORE_RE = /^.*?::SPOOL::\s+(ignore-start|ignore-end|ignore-next)\s*$/;
+const PASSAGE_REFERENCE_RE = /^(.*?)::SPOOL::\s+<<(.+?)#([\w-]+)(?::([\w-]+))?>>/;
 
 function magicCommentError(line: string, lineNum: number): ParseError {
-  const col = line.indexOf("@SPOOL") + 1;
+  const col = line.indexOf("::SPOOL::") + 1;
   const directiveMatch = SOURCE_DIRECTIVE_RE.exec(line);
 
   if (!directiveMatch) {
     return {
       line: lineNum,
       column: col,
-      length: "@SPOOL".length,
-      message: "Expected line to match '@SPOOL(start): #name' or '@SPOOL(end): #name'",
+      length: "::SPOOL::".length,
+      message: "Expected '::SPOOL:: start(#name)' or '::SPOOL:: end(#name)'",
     };
   }
 
   const directive = directiveMatch[1]!;
-  const directiveLength = directiveMatch[0]!.length - directiveMatch[0]!.indexOf("@SPOOL");
+  const directiveLength = directiveMatch[0]!.length - directiveMatch[0]!.indexOf("::SPOOL::");
 
-  if (directive !== "start" && directive !== "end") {
+  if (
+    directive !== "start" &&
+    directive !== "end" &&
+    !directive.startsWith("start") &&
+    !directive.startsWith("end")
+  ) {
     return {
       line: lineNum,
       column: col,
@@ -55,14 +60,21 @@ function magicCommentError(line: string, lineNum: number): ParseError {
     };
   }
 
-  const hasColon = /^.*?@SPOOL\((start|end)\)\s*:/.test(line);
+  const verb = directive.startsWith("end") ? "end" : "start";
+  if (directive.includes("(") && !directive.includes(")")) {
+    return {
+      line: lineNum,
+      column: col,
+      length: directiveLength,
+      message: `Unclosed parenthesis. Expected '::SPOOL:: ${verb}(#name)'`,
+    };
+  }
+
   return {
     line: lineNum,
     column: col,
     length: directiveLength,
-    message: hasColon
-      ? "Expected identifier ('#' followed by name)"
-      : "Expected line to match '@SPOOL(start): #name' or '@SPOOL(end): #name'",
+    message: "Expected passage name in the form '(#name)'",
   };
 }
 
@@ -150,7 +162,7 @@ export function parseSourcePassages(content: string): {
         }
         stack.push({ name: passageName, lines: [], nestedRefs: [] });
       }
-    } else if (line.includes("@SPOOL")) {
+    } else if (line.includes("::SPOOL::")) {
       errors.push(magicCommentError(line, i + 1));
     } else {
       for (const frame of stack) {
@@ -171,14 +183,14 @@ export function parseSourcePassages(content: string): {
 }
 
 function malformedReferenceError(line: string, lineNum: number): ParseError {
-  const col = line.indexOf("<<@SPOOL") + 1;
+  const col = line.indexOf("::SPOOL::") + 1;
   const closeIdx = line.indexOf(">>", col - 1);
-  const length = closeIdx >= 0 ? closeIdx + 2 - (col - 1) : "<<@SPOOL".length;
+  const length = closeIdx >= 0 ? closeIdx + 2 - (col - 1) : "::SPOOL::".length;
   return {
     line: lineNum,
     column: col,
     length,
-    message: "Expected reference to match '@SPOOL: file-path#passage-id'",
+    message: "Expected reference to match '::SPOOL:: <<file-path#passage-id>>'",
   };
 }
 
@@ -194,19 +206,19 @@ export function parsePassageReferences(content: string): {
     const line = lines[i]!;
     const match = PASSAGE_REFERENCE_RE.exec(line);
     if (match) {
-      const modifier = match[3];
+      const modifier = match[4];
       const raw = modifier
-        ? `<<@SPOOL: ${match[1]!}#${match[2]!}:${modifier}>>`
-        : `<<@SPOOL: ${match[1]!}#${match[2]!}>>`;
+        ? `::SPOOL:: <<${match[2]!}#${match[3]!}:${modifier}>>`
+        : `::SPOOL:: <<${match[2]!}#${match[3]!}>>`;
       refs.push({
-        filePath: match[1]!,
-        passageName: match[2]!,
+        filePath: match[2]!,
+        passageName: match[3]!,
         modifier,
         line: i + 1,
-        column: match[0]!.indexOf("<<") + 1,
+        column: match[0]!.indexOf("::SPOOL::") + 1,
         raw,
       });
-    } else if (line.includes("<<@SPOOL")) {
+    } else if (line.includes("::SPOOL::")) {
       errors.push(malformedReferenceError(line, i + 1));
     }
   }

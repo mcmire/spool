@@ -12,7 +12,11 @@ describe("getSourceFileDiagnostics", () => {
 
     test("valid passage returns no diagnostics", () => {
       const diagnostics = getSourceFileDiagnostics(
-        ["// @SPOOL(start): #car", "export class Car {}", "// @SPOOL(end): #car"].join("\n"),
+        [
+          "// ::SPOOL:: start(#car)",
+          "export class Car {}",
+          "// ::SPOOL:: end(#car)",
+        ].join("\n"),
       );
       expect(diagnostics).toEqual([]);
     });
@@ -20,22 +24,24 @@ describe("getSourceFileDiagnostics", () => {
 
   describe("invalid source", () => {
     test("malformed annotation produces diagnostic with correct range", () => {
-      const diagnostics = getSourceFileDiagnostics(["// @SPOOL(foo): #car"].join("\n"));
+      const diagnostics = getSourceFileDiagnostics(["// ::SPOOL:: foo(#car)"].join("\n"));
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 14 },
+            end: { line: 0, character: 22 },
           },
-          message: "Expected directive 'start' or 'end', got 'foo'",
+          message: "Expected directive 'start' or 'end', got 'foo(#car)'",
           source: "spool",
         },
       ]);
     });
 
     test("unclosed passage produces diagnostic with zero-length range", () => {
-      const diagnostics = getSourceFileDiagnostics(["// @SPOOL(start): #car", "code"].join("\n"));
+      const diagnostics = getSourceFileDiagnostics(
+        ["// ::SPOOL:: start(#car)", "code"].join("\n"),
+      );
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
@@ -51,16 +57,16 @@ describe("getSourceFileDiagnostics", () => {
 
     test("error on second line has correct line index", () => {
       const diagnostics = getSourceFileDiagnostics(
-        ["normal code", "// @SPOOL(bad): #car"].join("\n"),
+        ["normal code", "// ::SPOOL:: bad(#car)"].join("\n"),
       );
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 1, character: 3 },
-            end: { line: 1, character: 14 },
+            end: { line: 1, character: 22 },
           },
-          message: "Expected directive 'start' or 'end', got 'bad'",
+          message: "Expected directive 'start' or 'end', got 'bad(#car)'",
           source: "spool",
         },
       ]);
@@ -74,7 +80,7 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map([["src/car.ts:car", "export class Car {}"]]);
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["// <<@SPOOL: src/car.ts#car>>"].join("\n"),
+        ["// ::SPOOL:: <<src/car.ts#car>>"].join("\n"),
         registry,
         templateRegistry,
       );
@@ -85,7 +91,7 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map([["src/car.ts:car", "code"]]);
       const diagnostics = getDocFileDiagnostics(
-        ["// <<@SPOOL: src/car.ts#car:no-expand-nested>>"].join("\n"),
+        ["// ::SPOOL:: <<src/car.ts#car:no-expand-nested>>"].join("\n"),
         registry,
         templateRegistry,
       );
@@ -98,7 +104,7 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["// <<@SPOOL: src/car.ts#car>>"].join("\n"),
+        ["// ::SPOOL:: <<src/car.ts#car>>"].join("\n"),
         registry,
         templateRegistry,
       );
@@ -107,7 +113,7 @@ describe("getDocFileDiagnostics", () => {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 29 },
+            end: { line: 0, character: 31 },
           },
           message: "Unknown file: src/car.ts",
           source: "spool",
@@ -119,7 +125,7 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map([["src/car.ts:boat", "code"]]);
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["// <<@SPOOL: src/car.ts#car>>"].join("\n"),
+        ["// ::SPOOL:: <<src/car.ts#car>>"].join("\n"),
         registry,
         templateRegistry,
       );
@@ -128,7 +134,7 @@ describe("getDocFileDiagnostics", () => {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 29 },
+            end: { line: 0, character: 31 },
           },
           message: 'Unknown passage ID "car" in file src/car.ts',
           source: "spool",
@@ -140,7 +146,7 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map([["src/car.ts:car", "code"]]);
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["// <<@SPOOL: src/car.ts#car:bad-modifier>>"].join("\n"),
+        ["// ::SPOOL:: <<src/car.ts#car:bad-modifier>>"].join("\n"),
         registry,
         templateRegistry,
       );
@@ -149,7 +155,7 @@ describe("getDocFileDiagnostics", () => {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 42 },
+            end: { line: 0, character: 44 },
           },
           message: "Unknown modifier: bad-modifier",
           source: "spool",
@@ -161,7 +167,7 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["// <<@SPOOL: src/car.ts#car:no-expand-nested>>"].join("\n"),
+        ["// ::SPOOL:: <<src/car.ts#car:no-expand-nested>>"].join("\n"),
         registry,
         templateRegistry,
       );
@@ -170,7 +176,7 @@ describe("getDocFileDiagnostics", () => {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 46 },
+            end: { line: 0, character: 48 },
           },
           message: "Unknown file: src/car.ts",
           source: "spool",
@@ -182,7 +188,7 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["// <<@SPOOL: sadlkj>>"].join("\n"),
+        ["// ::SPOOL:: <<sadlkj>>"].join("\n"),
         registry,
         templateRegistry,
       );
@@ -191,9 +197,9 @@ describe("getDocFileDiagnostics", () => {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 21 },
+            end: { line: 0, character: 23 },
           },
-          message: "Expected reference to match '@SPOOL: file-path#passage-id'",
+          message: "Expected reference to match '::SPOOL:: <<file-path#passage-id>>'",
           source: "spool",
         },
       ]);
@@ -203,7 +209,7 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["normal text", "// <<@SPOOL: src/car.ts#car>>"].join("\n"),
+        ["normal text", "// ::SPOOL:: <<src/car.ts#car>>"].join("\n"),
         registry,
         templateRegistry,
       );
@@ -212,7 +218,7 @@ describe("getDocFileDiagnostics", () => {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 1, character: 3 },
-            end: { line: 1, character: 29 },
+            end: { line: 1, character: 31 },
           },
           message: "Unknown file: src/car.ts",
           source: "spool",

@@ -5,9 +5,11 @@ describe("parseSourcePassages", () => {
   describe("valid annotations", () => {
     test("basic start/end with == decorators", () => {
       const { passages, errors } = parseSourcePassages(
-        ["// == @SPOOL(start): #car ==", "export class Car {}", "// == @SPOOL(end): #car =="].join(
-          "\n",
-        ),
+        [
+          "// == ::SPOOL:: start(#car) ==",
+          "export class Car {}",
+          "// == ::SPOOL:: end(#car) ==",
+        ].join("\n"),
       );
       expect(passages.get("car")).toBe("export class Car {}");
       expect(errors).toEqual([]);
@@ -15,7 +17,7 @@ describe("parseSourcePassages", () => {
 
     test("start/end without == decorators", () => {
       const { passages, errors } = parseSourcePassages(
-        ["// @SPOOL(start): #car", "export class Car {}", "// @SPOOL(end): #car"].join("\n"),
+        ["// ::SPOOL:: start(#car)", "export class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
       );
       expect(passages.get("car")).toBe("export class Car {}");
       expect(errors).toEqual([]);
@@ -24,7 +26,9 @@ describe("parseSourcePassages", () => {
     test("different comment prefixes", () => {
       for (const prefix of ["//", "#", "--", "%", ";"]) {
         const { errors } = parseSourcePassages(
-          [`${prefix} @SPOOL(start): #thing`, "code", `${prefix} @SPOOL(end): #thing`].join("\n"),
+          [`${prefix} ::SPOOL:: start(#thing)`, "code", `${prefix} ::SPOOL:: end(#thing)`].join(
+            "\n",
+          ),
         );
         expect(errors).toEqual([]);
       }
@@ -33,13 +37,13 @@ describe("parseSourcePassages", () => {
     test("nested passages", () => {
       const { passages, errors } = parseSourcePassages(
         [
-          "// @SPOOL(start): #outer",
+          "// ::SPOOL:: start(#outer)",
           "line a",
-          "// @SPOOL(start): #inner",
+          "// ::SPOOL:: start(#inner)",
           "line b",
-          "// @SPOOL(end): #inner",
+          "// ::SPOOL:: end(#inner)",
           "line c",
-          "// @SPOOL(end): #outer",
+          "// ::SPOOL:: end(#outer)",
         ].join("\n"),
       );
       expect(passages.get("inner")).toBe("line b");
@@ -49,7 +53,7 @@ describe("parseSourcePassages", () => {
 
     test("hyphenated passage names", () => {
       const { errors } = parseSourcePassages(
-        ["// @SPOOL(start): #my-passage", "code", "// @SPOOL(end): #my-passage"].join("\n"),
+        ["// ::SPOOL:: start(#my-passage)", "code", "// ::SPOOL:: end(#my-passage)"].join("\n"),
       );
       expect(errors).toEqual([]);
     });
@@ -65,11 +69,11 @@ describe("parseSourcePassages", () => {
     test("markers inside an ignore block are not parsed", () => {
       const { passages, errors } = parseSourcePassages(
         [
-          "// @SPOOL(ignore-start)",
-          "// @SPOOL(start): #car",
+          "// ::SPOOL:: ignore-start",
+          "// ::SPOOL:: start(#car)",
           "export class Car {}",
-          "// @SPOOL(end): #car",
-          "// @SPOOL(ignore-end)",
+          "// ::SPOOL:: end(#car)",
+          "// ::SPOOL:: ignore-end",
         ].join("\n"),
       );
       expect(passages.size).toBe(0);
@@ -79,17 +83,17 @@ describe("parseSourcePassages", () => {
     test("passages outside an ignore block are still parsed", () => {
       const { passages, errors } = parseSourcePassages(
         [
-          "// @SPOOL(start): #before",
+          "// ::SPOOL:: start(#before)",
           "line a",
-          "// @SPOOL(end): #before",
-          "// @SPOOL(ignore-start)",
-          "// @SPOOL(start): #ignored",
+          "// ::SPOOL:: end(#before)",
+          "// ::SPOOL:: ignore-start",
+          "// ::SPOOL:: start(#ignored)",
           "line b",
-          "// @SPOOL(end): #ignored",
-          "// @SPOOL(ignore-end)",
-          "// @SPOOL(start): #after",
+          "// ::SPOOL:: end(#ignored)",
+          "// ::SPOOL:: ignore-end",
+          "// ::SPOOL:: start(#after)",
           "line c",
-          "// @SPOOL(end): #after",
+          "// ::SPOOL:: end(#after)",
         ].join("\n"),
       );
       expect(passages.get("before")).toBe("line a");
@@ -98,11 +102,13 @@ describe("parseSourcePassages", () => {
       expect(errors).toEqual([]);
     });
 
-    test("malformed @SPOOL inside an ignore block produces no error", () => {
+    test("malformed ::SPOOL:: inside an ignore block produces no error", () => {
       const { errors } = parseSourcePassages(
-        ["// @SPOOL(ignore-start)", "const re = /@SPOOL(start)/;", "// @SPOOL(ignore-end)"].join(
-          "\n",
-        ),
+        [
+          "// ::SPOOL:: ignore-start",
+          "const re = /::SPOOL:: start/;",
+          "// ::SPOOL:: ignore-end",
+        ].join("\n"),
       );
       expect(errors).toEqual([]);
     });
@@ -110,13 +116,13 @@ describe("parseSourcePassages", () => {
     test("ignore markers themselves do not appear as passage content", () => {
       const { passages, errors } = parseSourcePassages(
         [
-          "// @SPOOL(start): #outer",
+          "// ::SPOOL:: start(#outer)",
           "before",
-          "// @SPOOL(ignore-start)",
+          "// ::SPOOL:: ignore-start",
           "ignored content",
-          "// @SPOOL(ignore-end)",
+          "// ::SPOOL:: ignore-end",
           "after",
-          "// @SPOOL(end): #outer",
+          "// ::SPOOL:: end(#outer)",
         ].join("\n"),
       );
       expect(passages.get("outer")).toBe("before\nafter");
@@ -126,11 +132,11 @@ describe("parseSourcePassages", () => {
     test("ignore-next skips the following line", () => {
       const { passages, errors } = parseSourcePassages(
         [
-          "// @SPOOL(ignore-next)",
-          "// @SPOOL(start): #car",
+          "// ::SPOOL:: ignore-next",
+          "// ::SPOOL:: start(#car)",
           "export class Car {}",
-          "// @SPOOL(ignore-next)",
-          "// @SPOOL(end): #car",
+          "// ::SPOOL:: ignore-next",
+          "// ::SPOOL:: end(#car)",
         ].join("\n"),
       );
       expect(passages.size).toBe(0);
@@ -140,11 +146,11 @@ describe("parseSourcePassages", () => {
     test("ignore-next only skips one line", () => {
       const { passages, errors } = parseSourcePassages(
         [
-          "// @SPOOL(ignore-next)",
-          "// @SPOOL(start): #skipped",
-          "// @SPOOL(start): #kept",
+          "// ::SPOOL:: ignore-next",
+          "// ::SPOOL:: start(#skipped)",
+          "// ::SPOOL:: start(#kept)",
           "content",
-          "// @SPOOL(end): #kept",
+          "// ::SPOOL:: end(#kept)",
         ].join("\n"),
       );
       expect(passages.has("skipped")).toBe(false);
@@ -152,9 +158,9 @@ describe("parseSourcePassages", () => {
       expect(errors).toEqual([]);
     });
 
-    test("malformed @SPOOL on the next line after ignore-next produces no error", () => {
+    test("malformed ::SPOOL:: on the next line after ignore-next produces no error", () => {
       const { errors } = parseSourcePassages(
-        ["// @SPOOL(ignore-next)", "const re = /@SPOOL(start)/;"].join("\n"),
+        ["// ::SPOOL:: ignore-next", "const re = /::SPOOL:: start/;"].join("\n"),
       );
       expect(errors).toEqual([]);
     });
@@ -162,12 +168,12 @@ describe("parseSourcePassages", () => {
     test("ignore-next line itself does not appear as passage content", () => {
       const { passages, errors } = parseSourcePassages(
         [
-          "// @SPOOL(start): #outer",
+          "// ::SPOOL:: start(#outer)",
           "before",
-          "// @SPOOL(ignore-next)",
+          "// ::SPOOL:: ignore-next",
           "skipped",
           "after",
-          "// @SPOOL(end): #outer",
+          "// ::SPOOL:: end(#outer)",
         ].join("\n"),
       );
       expect(passages.get("outer")).toBe("before\nafter");
@@ -176,85 +182,97 @@ describe("parseSourcePassages", () => {
   });
 
   describe("invalid annotations", () => {
-    test("@SPOOL with no directive produces generic error", () => {
-      const { errors } = parseSourcePassages(["// @SPOOL"].join("\n"));
+    test("::SPOOL:: with no directive produces generic error", () => {
+      const { errors } = parseSourcePassages(["// ::SPOOL::"].join("\n"));
       expect(errors).toEqual([
         {
           line: 1,
           column: 4,
-          length: 6,
-          message: "Expected line to match '@SPOOL(start): #name' or '@SPOOL(end): #name'",
+          length: 9,
+          message: "Expected '::SPOOL:: start(#name)' or '::SPOOL:: end(#name)'",
         },
       ]);
     });
 
-    test("@SPOOL( with unclosed paren produces generic error", () => {
-      const { errors } = parseSourcePassages(["// @SPOOL("].join("\n"));
+    test("::SPOOL:: + start with unclosed paren produces generic error", () => {
+      const { errors } = parseSourcePassages(["// ::SPOOL:: start("].join("\n"));
       expect(errors).toEqual([
         {
           line: 1,
           column: 4,
-          length: 6,
-          message: "Expected line to match '@SPOOL(start): #name' or '@SPOOL(end): #name'",
+          length: 16,
+          message: "Unclosed parenthesis. Expected '::SPOOL:: start(#name)'",
+        },
+      ]);
+    });
+
+    test("::SPOOL:: + end with unclosed paren produces generic error", () => {
+      const { errors } = parseSourcePassages(["// ::SPOOL:: end("].join("\n"));
+      expect(errors).toEqual([
+        {
+          line: 1,
+          column: 4,
+          length: 14,
+          message: "Unclosed parenthesis. Expected '::SPOOL:: end(#name)'",
         },
       ]);
     });
 
     test("unknown directive produces specific error", () => {
-      const { errors } = parseSourcePassages(["// @SPOOL(foo): #car"].join("\n"));
+      const { errors } = parseSourcePassages(["// ::SPOOL:: foo(#car)"].join("\n"));
       expect(errors).toEqual([
         {
           line: 1,
           column: 4,
-          length: 11,
-          message: "Expected directive 'start' or 'end', got 'foo'",
+          length: 19,
+          message: "Expected directive 'start' or 'end', got 'foo(#car)'",
         },
       ]);
     });
 
-    test("valid directive with no colon produces generic error", () => {
-      const { errors } = parseSourcePassages(["// @SPOOL(start)"].join("\n"));
+    test("valid directive with no name produces error", () => {
+      const { errors } = parseSourcePassages(["// ::SPOOL:: start"].join("\n"));
       expect(errors).toEqual([
         {
           line: 1,
           column: 4,
-          length: 13,
-          message: "Expected line to match '@SPOOL(start): #name' or '@SPOOL(end): #name'",
+          length: 15,
+          message: "Expected passage name in the form '(#name)'",
         },
       ]);
     });
 
-    test("missing # identifier produces specific error", () => {
-      const { errors } = parseSourcePassages(["// @SPOOL(start): car"].join("\n"));
+    test("missing # in name produces error", () => {
+      const { errors } = parseSourcePassages(["// ::SPOOL:: start(car)"].join("\n"));
       expect(errors).toEqual([
         {
           line: 1,
           column: 4,
-          length: 13,
-          message: "Expected identifier ('#' followed by name)",
+          length: 20,
+          message: "Expected passage name in the form '(#name)'",
         },
       ]);
     });
 
-    test("identifier with no name produces specific error", () => {
-      const { errors } = parseSourcePassages(["// @SPOOL(start): #"].join("\n"));
+    test("empty name produces error", () => {
+      const { errors } = parseSourcePassages(["// ::SPOOL:: start(#)"].join("\n"));
       expect(errors).toEqual([
         {
           line: 1,
           column: 4,
-          length: 13,
-          message: "Expected identifier ('#' followed by name)",
+          length: 18,
+          message: "Expected passage name in the form '(#name)'",
         },
       ]);
     });
 
     test("open without close", () => {
-      const { errors } = parseSourcePassages(["// @SPOOL(start): #car", "code"].join("\n"));
+      const { errors } = parseSourcePassages(["// ::SPOOL:: start(#car)", "code"].join("\n"));
       expect(errors).toEqual([{ line: 1, column: 1, message: 'Unclosed passage "car"' }]);
     });
 
     test("close without open", () => {
-      const { errors } = parseSourcePassages(["// @SPOOL(end): #car"].join("\n"));
+      const { errors } = parseSourcePassages(["// ::SPOOL:: end(#car)"].join("\n"));
       expect(errors).toEqual([
         {
           line: 1,
@@ -266,7 +284,7 @@ describe("parseSourcePassages", () => {
 
     test("mismatched close", () => {
       const { errors } = parseSourcePassages(
-        ["// @SPOOL(start): #car", "// @SPOOL(end): #boat"].join("\n"),
+        ["// ::SPOOL:: start(#car)", "// ::SPOOL:: end(#boat)"].join("\n"),
       );
       expect(errors).toEqual([
         {
@@ -281,12 +299,12 @@ describe("parseSourcePassages", () => {
     test("duplicate passage name", () => {
       const { errors } = parseSourcePassages(
         [
-          "// @SPOOL(start): #car",
+          "// ::SPOOL:: start(#car)",
           "code",
-          "// @SPOOL(end): #car",
-          "// @SPOOL(start): #car",
+          "// ::SPOOL:: end(#car)",
+          "// ::SPOOL:: start(#car)",
           "more code",
-          "// @SPOOL(end): #car",
+          "// ::SPOOL:: end(#car)",
         ].join("\n"),
       );
       expect(errors).toEqual([
@@ -303,7 +321,9 @@ describe("parseSourcePassages", () => {
 describe("parsePassageReferences", () => {
   describe("valid references", () => {
     test("basic reference", () => {
-      const { refs, errors } = parsePassageReferences(["// <<@SPOOL: src/car.ts#car>>"].join("\n"));
+      const { refs, errors } = parsePassageReferences(
+        ["// ::SPOOL:: <<src/car.ts#car>>"].join("\n"),
+      );
       expect(refs).toEqual([
         {
           filePath: "src/car.ts",
@@ -311,7 +331,7 @@ describe("parsePassageReferences", () => {
           modifier: undefined,
           line: 1,
           column: 4,
-          raw: "<<@SPOOL: src/car.ts#car>>",
+          raw: "::SPOOL:: <<src/car.ts#car>>",
         },
       ]);
       expect(errors).toEqual([]);
@@ -319,7 +339,7 @@ describe("parsePassageReferences", () => {
 
     test("reference with modifier", () => {
       const { refs, errors } = parsePassageReferences(
-        ["// <<@SPOOL: src/car.ts#car:no-expand-nested>>"].join("\n"),
+        ["// ::SPOOL:: <<src/car.ts#car:no-expand-nested>>"].join("\n"),
       );
       expect(refs).toEqual([
         {
@@ -328,7 +348,7 @@ describe("parsePassageReferences", () => {
           modifier: "no-expand-nested",
           line: 1,
           column: 4,
-          raw: "<<@SPOOL: src/car.ts#car:no-expand-nested>>",
+          raw: "::SPOOL:: <<src/car.ts#car:no-expand-nested>>",
         },
       ]);
       expect(errors).toEqual([]);
@@ -344,38 +364,26 @@ describe("parsePassageReferences", () => {
   });
 
   describe("invalid references", () => {
-    test("<<@SPOOL with no colon", () => {
-      const { errors } = parsePassageReferences(["// <<@SPOOL"].join("\n"));
+    test("::SPOOL:: with no angle brackets produces error", () => {
+      const { errors } = parsePassageReferences(["// ::SPOOL::"].join("\n"));
       expect(errors).toEqual([
         {
           line: 1,
           column: 4,
-          length: 8,
-          message: "Expected reference to match '@SPOOL: file-path#passage-id'",
+          length: 9,
+          message: "Expected reference to match '::SPOOL:: <<file-path#passage-id>>'",
         },
       ]);
     });
 
-    test("<<@SPOOL: with no path or name", () => {
-      const { errors } = parsePassageReferences(["// <<@SPOOL:"].join("\n"));
+    test("::SPOOL:: with no # separator produces error", () => {
+      const { errors } = parsePassageReferences(["// ::SPOOL:: <<sadlkj>>"].join("\n"));
       expect(errors).toEqual([
         {
           line: 1,
           column: 4,
-          length: 8,
-          message: "Expected reference to match '@SPOOL: file-path#passage-id'",
-        },
-      ]);
-    });
-
-    test("<<@SPOOL: with path but no # separator", () => {
-      const { errors } = parsePassageReferences(["// <<@SPOOL: sadlkj>>"].join("\n"));
-      expect(errors).toEqual([
-        {
-          line: 1,
-          column: 4,
-          length: 18,
-          message: "Expected reference to match '@SPOOL: file-path#passage-id'",
+          length: 20,
+          message: "Expected reference to match '::SPOOL:: <<file-path#passage-id>>'",
         },
       ]);
     });
