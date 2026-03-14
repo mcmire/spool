@@ -27,6 +27,7 @@ export const VALID_MODIFIERS = new Set(["no-expand-nested"]);
 
 const SOURCE_ANNOTATION_RE = /^(.*?)(?:==\s*)?@SPOOL\((start|end)\):\s*#([\w-]+)(?:\s*==)?\s*$/;
 const SOURCE_DIRECTIVE_RE = /^.*?@SPOOL\((\w+)\)/;
+const SOURCE_IGNORE_RE = /^.*?@SPOOL\((ignore-start|ignore-end|ignore-next)\)\s*$/;
 const PASSAGE_REFERENCE_RE = /^.*?<<@SPOOL:\s*(.+?)#([\w-]+)(?::([\w-]+))?>>/;
 
 function magicCommentError(line: string, lineNum: number): ParseError {
@@ -75,9 +76,32 @@ export function parseSourcePassages(content: string): {
   const errors: ParseError[] = [];
   const stack: Frame[] = [];
   const lines = content.split("\n");
+  let ignoring = false;
+  let ignoreNext = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+
+    const ignoreMatch = SOURCE_IGNORE_RE.exec(line);
+    if (ignoreMatch) {
+      const directive = ignoreMatch[1]!;
+      if (directive === "ignore-next") {
+        ignoreNext = true;
+      } else {
+        ignoring = directive === "ignore-start";
+      }
+      continue;
+    }
+
+    if (ignoring) {
+      continue;
+    }
+
+    if (ignoreNext) {
+      ignoreNext = false;
+      continue;
+    }
+
     const match = SOURCE_ANNOTATION_RE.exec(line);
 
     if (match) {
@@ -167,7 +191,8 @@ export function parsePassageReferences(content: string): {
   const lines = content.split("\n");
 
   for (let i = 0; i < lines.length; i++) {
-    const match = PASSAGE_REFERENCE_RE.exec(lines[i]!);
+    const line = lines[i]!;
+    const match = PASSAGE_REFERENCE_RE.exec(line);
     if (match) {
       const modifier = match[3];
       const raw = modifier
@@ -181,8 +206,8 @@ export function parsePassageReferences(content: string): {
         column: match[0]!.indexOf("<<") + 1,
         raw,
       });
-    } else if (lines[i]!.includes("<<@SPOOL")) {
-      errors.push(malformedReferenceError(lines[i]!, i + 1));
+    } else if (line.includes("<<@SPOOL")) {
+      errors.push(malformedReferenceError(line, i + 1));
     }
   }
 

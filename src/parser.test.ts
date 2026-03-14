@@ -61,6 +61,118 @@ describe("parseSourcePassages", () => {
       expect(passages.size).toBe(0);
       expect(errors).toEqual([]);
     });
+
+    test("markers inside an ignore block are not parsed", () => {
+      const { passages, errors } = parseSourcePassages(
+        [
+          "// @SPOOL(ignore-start)",
+          "// @SPOOL(start): #car",
+          "export class Car {}",
+          "// @SPOOL(end): #car",
+          "// @SPOOL(ignore-end)",
+        ].join("\n"),
+      );
+      expect(passages.size).toBe(0);
+      expect(errors).toEqual([]);
+    });
+
+    test("passages outside an ignore block are still parsed", () => {
+      const { passages, errors } = parseSourcePassages(
+        [
+          "// @SPOOL(start): #before",
+          "line a",
+          "// @SPOOL(end): #before",
+          "// @SPOOL(ignore-start)",
+          "// @SPOOL(start): #ignored",
+          "line b",
+          "// @SPOOL(end): #ignored",
+          "// @SPOOL(ignore-end)",
+          "// @SPOOL(start): #after",
+          "line c",
+          "// @SPOOL(end): #after",
+        ].join("\n"),
+      );
+      expect(passages.get("before")).toBe("line a");
+      expect(passages.get("after")).toBe("line c");
+      expect(passages.has("ignored")).toBe(false);
+      expect(errors).toEqual([]);
+    });
+
+    test("malformed @SPOOL inside an ignore block produces no error", () => {
+      const { errors } = parseSourcePassages(
+        ["// @SPOOL(ignore-start)", "const re = /@SPOOL(start)/;", "// @SPOOL(ignore-end)"].join(
+          "\n",
+        ),
+      );
+      expect(errors).toEqual([]);
+    });
+
+    test("ignore markers themselves do not appear as passage content", () => {
+      const { passages, errors } = parseSourcePassages(
+        [
+          "// @SPOOL(start): #outer",
+          "before",
+          "// @SPOOL(ignore-start)",
+          "ignored content",
+          "// @SPOOL(ignore-end)",
+          "after",
+          "// @SPOOL(end): #outer",
+        ].join("\n"),
+      );
+      expect(passages.get("outer")).toBe("before\nafter");
+      expect(errors).toEqual([]);
+    });
+
+    test("ignore-next skips the following line", () => {
+      const { passages, errors } = parseSourcePassages(
+        [
+          "// @SPOOL(ignore-next)",
+          "// @SPOOL(start): #car",
+          "export class Car {}",
+          "// @SPOOL(ignore-next)",
+          "// @SPOOL(end): #car",
+        ].join("\n"),
+      );
+      expect(passages.size).toBe(0);
+      expect(errors).toEqual([]);
+    });
+
+    test("ignore-next only skips one line", () => {
+      const { passages, errors } = parseSourcePassages(
+        [
+          "// @SPOOL(ignore-next)",
+          "// @SPOOL(start): #skipped",
+          "// @SPOOL(start): #kept",
+          "content",
+          "// @SPOOL(end): #kept",
+        ].join("\n"),
+      );
+      expect(passages.has("skipped")).toBe(false);
+      expect(passages.get("kept")).toBe("content");
+      expect(errors).toEqual([]);
+    });
+
+    test("malformed @SPOOL on the next line after ignore-next produces no error", () => {
+      const { errors } = parseSourcePassages(
+        ["// @SPOOL(ignore-next)", "const re = /@SPOOL(start)/;"].join("\n"),
+      );
+      expect(errors).toEqual([]);
+    });
+
+    test("ignore-next line itself does not appear as passage content", () => {
+      const { passages, errors } = parseSourcePassages(
+        [
+          "// @SPOOL(start): #outer",
+          "before",
+          "// @SPOOL(ignore-next)",
+          "skipped",
+          "after",
+          "// @SPOOL(end): #outer",
+        ].join("\n"),
+      );
+      expect(passages.get("outer")).toBe("before\nafter");
+      expect(errors).toEqual([]);
+    });
   });
 
   describe("invalid annotations", () => {
