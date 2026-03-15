@@ -14,7 +14,7 @@ program
   .option("-w, --watch", "Watch for changes and re-weave automatically")
   .option("-c, --clean", "Clear the target directory before weaving")
   .action(async (options: { watch?: boolean; clean?: boolean }) => {
-    const { weaveCommand } = await import("./commands/weave.ts");
+    const { weaveCommand } = await import("./commands/weave/command.ts");
     await weaveCommand(options);
   });
 
@@ -22,7 +22,7 @@ program
   .command("lint")
   .description("Check for errors in source annotations and passage references")
   .action(async () => {
-    const { lintCommand } = await import("./commands/lint.ts");
+    const { lintCommand } = await import("./commands/lint/command.ts");
     await lintCommand();
   });
 

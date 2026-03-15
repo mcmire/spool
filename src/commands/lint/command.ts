@@ -1,6 +1,6 @@
-import { findProjectRoot, loadConfig } from "../config.ts";
-import { lintProject } from "../linter.ts";
-import type { FileErrors } from "../registries.ts";
+import { findProjectRoot, loadConfig } from "../../config.ts";
+import { lintProject } from "./lint-project.ts";
+import type { FileErrors } from "../../registries.ts";
 
 function printErrors(fileErrors: FileErrors[]): void {
   for (const { filePath, errors } of fileErrors) {

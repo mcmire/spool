@@ -152,11 +152,7 @@ describe("weaveProject", () => {
           "src/car.ts",
           ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
         );
-        await createFile(
-          root,
-          "docs/guide.md",
-          "# Guide\n// ::SPOOL:: <<car.ts#car>>",
-        );
+        await createFile(root, "docs/guide.md", "# Guide\n// ::SPOOL:: <<car.ts#car>>");
 
         await weaveProject(root, makeConfig());
 

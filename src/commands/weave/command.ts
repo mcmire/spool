@@ -1,10 +1,10 @@
 import { watch } from "node:fs";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
-import { findProjectRoot, loadConfig } from "../config.ts";
-import type { SpoolConfig } from "../config.ts";
-import { weaveProject } from "../weaver.ts";
-import type { FileErrors } from "../registries.ts";
+import { findProjectRoot, loadConfig } from "../../config.ts";
+import type { SpoolConfig } from "../../config.ts";
+import { weaveProject } from "../../weaver.ts";
+import type { FileErrors } from "../../registries.ts";
 
 function printErrors(fileErrors: FileErrors[]): void {
   for (const { filePath, errors } of fileErrors) {

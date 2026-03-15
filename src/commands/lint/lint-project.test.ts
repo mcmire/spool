@@ -1,9 +1,9 @@
 import { test, expect, describe } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { lintProject } from "./linter.ts";
-import type { SpoolConfig } from "./config.ts";
-import { withTempDir } from "../tests/helpers.ts";
+import { lintProject } from "./lint-project.ts";
+import type { SpoolConfig } from "../../config.ts";
+import { withTempDir } from "../../../tests/helpers.ts";
 
 function makeConfig(overrides?: Partial<SpoolConfig["source"]>): SpoolConfig {
   return {

@@ -1,10 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { join, relative, posix } from "node:path";
 import { Glob } from "bun";
-import type { SpoolConfig } from "./config.ts";
-import { parsePassageReferences } from "./parser.ts";
-import { buildRegistries } from "./registries.ts";
-import type { FileErrors } from "./registries.ts";
+import type { SpoolConfig } from "../../config.ts";
+import { parsePassageReferences } from "../../parser.ts";
+import { buildRegistries } from "../../registries.ts";
+import type { FileErrors } from "../../registries.ts";
 
 export type LintResult = {
   registryErrors: FileErrors[];
