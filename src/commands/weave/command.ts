@@ -6,50 +6,74 @@ import type { SpoolConfig } from "../../config.ts";
 import { weaveProject } from "../../weaver.ts";
 import type { FileErrors } from "../../registries.ts";
 
-function printErrors(fileErrors: FileErrors[]): void {
+type Writable = { write(s: string): void };
+
+export type WeaveCommandOptions = {
+  cwd: string;
+  stdout: Writable;
+  stderr: Writable;
+  watch?: boolean;
+  clean?: boolean;
+};
+
+export type WeaveCommandResult = {
+  exitCode?: number;
+};
+
+function printErrors(fileErrors: FileErrors[], stderr: Writable): void {
   for (const { filePath, errors } of fileErrors) {
     for (const error of errors) {
-      console.error(`  ${filePath}:${error.line}:${error.column}: ${error.message}`);
+      stderr.write(`  ${filePath}:${error.line}:${error.column}: ${error.message}\n`);
     }
   }
 }
 
-async function runWeave(projectRoot: string, config: SpoolConfig): Promise<boolean> {
+async function runWeave(
+  projectRoot: string,
+  config: SpoolConfig,
+  stdout: Writable,
+  stderr: Writable,
+): Promise<boolean> {
   const result = await weaveProject(projectRoot, config);
 
-  console.log(`Wove ${result.filesProcessed} doc file(s), wrote ${result.filesWritten} output(s).`);
+  stdout.write(
+    `Wove ${result.filesProcessed} doc file(s), wrote ${result.filesWritten} output(s).\n`,
+  );
 
   const hasErrors = result.registryErrors.length > 0 || result.weaveErrors.length > 0;
 
   if (result.registryErrors.length > 0) {
-    console.error("\nSource file errors:");
-    printErrors(result.registryErrors);
+    stderr.write("\nSource file errors:\n");
+    printErrors(result.registryErrors, stderr);
   }
 
   if (result.weaveErrors.length > 0) {
-    console.error("\nWeave errors:");
-    printErrors(result.weaveErrors);
+    stderr.write("\nWeave errors:\n");
+    printErrors(result.weaveErrors, stderr);
   }
 
   return hasErrors;
 }
 
-export async function weaveCommand(options: { watch?: boolean; clean?: boolean }): Promise<void> {
-  const projectRoot = findProjectRoot(process.cwd());
+export async function weaveCommand({
+  cwd,
+  stdout,
+  stderr,
+  watch: watchMode = false,
+  clean = false,
+}: WeaveCommandOptions): Promise<WeaveCommandResult> {
+  const projectRoot = findProjectRoot(cwd);
   const config = await loadConfig(projectRoot);
 
-  if (options.clean) {
+  if (clean) {
     const targetDir = join(projectRoot, config.target);
     await rm(targetDir, { recursive: true, force: true });
   }
 
-  const hasErrors = await runWeave(projectRoot, config);
+  const hasErrors = await runWeave(projectRoot, config, stdout, stderr);
 
-  if (!options.watch) {
-    if (hasErrors) {
-      process.exit(1);
-    }
-    return;
+  if (!watchMode) {
+    return hasErrors ? { exitCode: 1 } : {};
   }
 
   const sourceDir = join(projectRoot, config.source.code);
@@ -63,14 +87,14 @@ export async function weaveCommand(options: { watch?: boolean; clean?: boolean }
     }
     debounceTimer = setTimeout(async () => {
       try {
-        await runWeave(projectRoot, config);
+        await runWeave(projectRoot, config, stdout, stderr);
       } catch (err) {
-        console.error("Re-weave failed:", err);
+        stderr.write(`Re-weave failed: ${err}\n`);
       }
     }, 200);
   }
 
-  console.log("Watching for changes…");
+  stdout.write("Watching for changes…\n");
 
   watch(sourceDir, { recursive: true }, (_event, filename) => {
     if (filename) {
@@ -85,4 +109,6 @@ export async function weaveCommand(options: { watch?: boolean; clean?: boolean }
       }
     });
   }
+
+  return {};
 }

@@ -15,7 +15,10 @@ program
   .option("-c, --clean", "Clear the target directory before weaving")
   .action(async (options: { watch?: boolean; clean?: boolean }) => {
     const { weaveCommand } = await import("./commands/weave/command.ts");
-    await weaveCommand(options);
+    const result = await weaveCommand({ cwd: process.cwd(), stdout: process.stdout, stderr: process.stderr, ...options });
+    if (result.exitCode !== undefined) {
+      process.exitCode = result.exitCode;
+    }
   });
 
 program
