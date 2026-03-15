@@ -69,7 +69,11 @@ describe("weaveCommand", () => {
         await mkdir(join(root, "src"), { recursive: true });
         await createFile(root, "docs/guide.md", "# Guide");
 
-        const { exitCode } = await weaveCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
+        const { exitCode } = await weaveCommand({
+          cwd: root,
+          stdout: makeWritable(),
+          stderr: makeWritable(),
+        });
 
         expect(exitCode).toBeUndefined();
       }));
@@ -103,7 +107,7 @@ describe("weaveCommand", () => {
 
         expect(stderr.output).toBe(
           "\nWeave errors:\n" +
-          "  docs/guide.md:1:4: Unknown reference: ::SPOOL:: <<car.ts#missing>>\n",
+            "  docs/guide.md:1:4: Unknown reference: ::SPOOL:: <<car.ts#missing>>\n",
         );
       }));
 
@@ -113,7 +117,11 @@ describe("weaveCommand", () => {
         await mkdir(join(root, "src"), { recursive: true });
         await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#missing>>");
 
-        const { exitCode } = await weaveCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
+        const { exitCode } = await weaveCommand({
+          cwd: root,
+          stdout: makeWritable(),
+          stderr: makeWritable(),
+        });
 
         expect(exitCode).toBe(1);
       }));
@@ -134,8 +142,7 @@ describe("weaveCommand", () => {
         await weaveCommand({ cwd: root, stdout: makeWritable(), stderr });
 
         expect(stderr.output).toBe(
-          "\nSource file errors:\n" +
-          '  src/broken.ts:1:1: Unclosed passage "car"\n',
+          "\nSource file errors:\n" + '  src/broken.ts:1:1: Unclosed passage "car"\n',
         );
       }));
 
@@ -149,7 +156,11 @@ describe("weaveCommand", () => {
         );
         await createFile(root, "docs/guide.md", "# Guide");
 
-        const { exitCode } = await weaveCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
+        const { exitCode } = await weaveCommand({
+          cwd: root,
+          stdout: makeWritable(),
+          stderr: makeWritable(),
+        });
 
         expect(exitCode).toBe(1);
       }));
@@ -163,7 +174,12 @@ describe("weaveCommand", () => {
         await createFile(root, "docs/guide.md", "# Guide");
         await createFile(root, "out/stale.md", "stale");
 
-        await weaveCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable(), clean: true });
+        await weaveCommand({
+          cwd: root,
+          stdout: makeWritable(),
+          stderr: makeWritable(),
+          clean: true,
+        });
 
         await expect(readFile(join(root, "out/stale.md"), "utf-8")).rejects.toThrow();
       }));
@@ -180,8 +196,7 @@ describe("weaveCommand", () => {
         await weaveCommand({ cwd: root, stdout, stderr: makeWritable(), watch: true });
 
         expect(stdout.output).toBe(
-          "Wove 1 doc file(s), wrote 1 output(s).\n" +
-          "Watching for changes…\n",
+          "Wove 1 doc file(s), wrote 1 output(s).\n" + "Watching for changes…\n",
         );
       }));
 
@@ -191,7 +206,12 @@ describe("weaveCommand", () => {
         await mkdir(join(root, "src"), { recursive: true });
         await createFile(root, "docs/guide.md", "# Guide");
 
-        await weaveCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable(), watch: true });
+        await weaveCommand({
+          cwd: root,
+          stdout: makeWritable(),
+          stderr: makeWritable(),
+          watch: true,
+        });
 
         expect(mockWatch).toHaveBeenCalledWith(
           join(root, "src"),
@@ -206,7 +226,12 @@ describe("weaveCommand", () => {
         await mkdir(join(root, "src"), { recursive: true });
         await createFile(root, "docs/guide.md", "# Guide");
 
-        await weaveCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable(), watch: true });
+        await weaveCommand({
+          cwd: root,
+          stdout: makeWritable(),
+          stderr: makeWritable(),
+          watch: true,
+        });
 
         expect(mockWatch).toHaveBeenCalledWith(
           join(root, "docs"),
@@ -224,7 +249,12 @@ describe("weaveCommand", () => {
         );
         await createFile(root, "src/docs/guide.md", "# Guide");
 
-        await weaveCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable(), watch: true });
+        await weaveCommand({
+          cwd: root,
+          stdout: makeWritable(),
+          stderr: makeWritable(),
+          watch: true,
+        });
 
         const calledPaths = mockWatch.mock.calls.map((c) => c[0]);
         expect(calledPaths).not.toContain(join(root, "src/docs"));
@@ -249,7 +279,12 @@ describe("weaveCommand", () => {
           capturedListener = listener;
         });
 
-        await weaveCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable(), watch: true });
+        await weaveCommand({
+          cwd: root,
+          stdout: makeWritable(),
+          stderr: makeWritable(),
+          watch: true,
+        });
 
         capturedListener!("change", "guide.md");
         expect(jest.getTimerCount()).toBe(1);

@@ -29,11 +29,7 @@ describe("buildRegistries", () => {
         await createFile(
           root,
           "src/car.ts",
-          [
-            "// ::SPOOL:: start(#car)",
-            "export class Car {}",
-            "// ::SPOOL:: end(#car)",
-          ].join("\n"),
+          ["// ::SPOOL:: start(#car)", "export class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
         );
 
         const { registry, templateRegistry, errors } = await buildRegistries(root, makeConfig());
@@ -251,16 +247,8 @@ describe("buildRegistries", () => {
   describe("when multiple source files have malformed annotations", () => {
     test("reports errors for each file independently", () =>
       withTempDir(async (root) => {
-        await createFile(
-          root,
-          "src/a.ts",
-          ["// ::SPOOL:: start(#a)", "class A {}"].join("\n"),
-        );
-        await createFile(
-          root,
-          "src/b.ts",
-          ["// ::SPOOL:: start(#b)", "class B {}"].join("\n"),
-        );
+        await createFile(root, "src/a.ts", ["// ::SPOOL:: start(#a)", "class A {}"].join("\n"));
+        await createFile(root, "src/b.ts", ["// ::SPOOL:: start(#b)", "class B {}"].join("\n"));
 
         const { errors } = await buildRegistries(root, makeConfig());
 

@@ -15,7 +15,12 @@ program
   .option("-c, --clean", "Clear the target directory before weaving")
   .action(async (options: { watch?: boolean; clean?: boolean }) => {
     const { weaveCommand } = await import("./commands/weave/command.ts");
-    const result = await weaveCommand({ cwd: process.cwd(), stdout: process.stdout, stderr: process.stderr, ...options });
+    const result = await weaveCommand({
+      cwd: process.cwd(),
+      stdout: process.stdout,
+      stderr: process.stderr,
+      ...options,
+    });
     if (result.exitCode !== undefined) {
       process.exitCode = result.exitCode;
     }
@@ -26,7 +31,11 @@ program
   .description("Check for errors in source annotations and passage references")
   .action(async () => {
     const { lintCommand } = await import("./commands/lint/command.ts");
-    const result = await lintCommand({ cwd: process.cwd(), stdout: process.stdout, stderr: process.stderr });
+    const result = await lintCommand({
+      cwd: process.cwd(),
+      stdout: process.stdout,
+      stderr: process.stderr,
+    });
     if (result.exitCode !== undefined) {
       process.exitCode = result.exitCode;
     }

@@ -12,11 +12,7 @@ describe("getSourceFileDiagnostics", () => {
 
     test("valid passage returns no diagnostics", () => {
       const diagnostics = getSourceFileDiagnostics(
-        [
-          "// ::SPOOL:: start(#car)",
-          "export class Car {}",
-          "// ::SPOOL:: end(#car)",
-        ].join("\n"),
+        ["// ::SPOOL:: start(#car)", "export class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
       );
       expect(diagnostics).toEqual([]);
     });
@@ -39,9 +35,7 @@ describe("getSourceFileDiagnostics", () => {
     });
 
     test("unclosed passage produces diagnostic with zero-length range", () => {
-      const diagnostics = getSourceFileDiagnostics(
-        ["// ::SPOOL:: start(#car)", "code"].join("\n"),
-      );
+      const diagnostics = getSourceFileDiagnostics(["// ::SPOOL:: start(#car)", "code"].join("\n"));
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,

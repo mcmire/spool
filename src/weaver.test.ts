@@ -6,9 +6,10 @@ import type { PassageRegistry, PassageTemplateRegistry } from "./registries.ts";
 import type { SpoolConfig } from "./config.ts";
 import { withTempDir } from "../tests/helpers.ts";
 
-function makeRegistries(
-  entries: Record<string, { registry: string; template?: string }>,
-): { registry: PassageRegistry; templateRegistry: PassageTemplateRegistry } {
+function makeRegistries(entries: Record<string, { registry: string; template?: string }>): {
+  registry: PassageRegistry;
+  templateRegistry: PassageTemplateRegistry;
+} {
   const registry: PassageRegistry = new Map();
   const templateRegistry: PassageTemplateRegistry = new Map();
   for (const [key, { registry: r, template }] of Object.entries(entries)) {

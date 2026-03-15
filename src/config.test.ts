@@ -128,9 +128,7 @@ describe("loadConfig", () => {
       withTempDir(async (root) => {
         await writeConfig(root, { source: { docs: "docs" }, target: "out" });
 
-        expect(loadConfig(root)).rejects.toThrow(
-          'Missing or invalid "source.code" in spool.json',
-        );
+        expect(loadConfig(root)).rejects.toThrow('Missing or invalid "source.code" in spool.json');
       }));
   });
 
@@ -139,9 +137,7 @@ describe("loadConfig", () => {
       withTempDir(async (root) => {
         await writeConfig(root, { source: { code: [], docs: "docs" }, target: "out" });
 
-        expect(loadConfig(root)).rejects.toThrow(
-          'Missing or invalid "source.code" in spool.json',
-        );
+        expect(loadConfig(root)).rejects.toThrow('Missing or invalid "source.code" in spool.json');
       }));
   });
 
