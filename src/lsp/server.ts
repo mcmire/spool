@@ -14,7 +14,8 @@ import type { SpoolConfig } from "../config.ts";
 import { buildRegistries } from "../registries.ts";
 import type { PassageRegistry, PassageTemplateRegistry } from "../registries.ts";
 import { getSourceFileDiagnostics, getDocFileDiagnostics } from "./diagnostics.ts";
-import { version } from "../../package.json" with { type: "json" };
+import packageJson from "../../package.json" with { type: "json" };
+const { version } = packageJson;
 
 export function startServer(): void {
   const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
@@ -102,7 +103,7 @@ export function startServer(): void {
     if (isSourceFile(filePath)) {
       return getSourceFileDiagnostics(content);
     } else if (isDocFile(filePath)) {
-      return getDocFileDiagnostics(content, registry, templateRegistry, config.source.code);
+      return getDocFileDiagnostics(content, registry, templateRegistry, config?.source.code ?? "");
     } else {
       return [];
     }
