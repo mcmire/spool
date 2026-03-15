@@ -23,7 +23,10 @@ program
   .description("Check for errors in source annotations and passage references")
   .action(async () => {
     const { lintCommand } = await import("./commands/lint/command.ts");
-    await lintCommand();
+    const result = await lintCommand({ cwd: process.cwd(), stdout: process.stdout, stderr: process.stderr });
+    if (result.exitCode !== undefined) {
+      process.exitCode = result.exitCode;
+    }
   });
 
 program
