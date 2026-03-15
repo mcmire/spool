@@ -4,13 +4,15 @@ import { getSourceFileDiagnostics, getDocFileDiagnostics } from "./diagnostics.t
 import type { PassageRegistry, PassageTemplateRegistry } from "../registries.ts";
 
 describe("getSourceFileDiagnostics", () => {
-  describe("valid source", () => {
-    test("no annotations returns no diagnostics", () => {
+  describe("when the source contains no annotations", () => {
+    test("returns no diagnostics", () => {
       const diagnostics = getSourceFileDiagnostics("just normal code\nmore code");
       expect(diagnostics).toEqual([]);
     });
+  });
 
-    test("valid passage returns no diagnostics", () => {
+  describe("when the source contains a valid passage", () => {
+    test("returns no diagnostics", () => {
       const diagnostics = getSourceFileDiagnostics(
         ["// ::SPOOL:: start(#car)", "export class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
       );
@@ -18,9 +20,9 @@ describe("getSourceFileDiagnostics", () => {
     });
   });
 
-  describe("invalid source", () => {
-    test("malformed annotation produces diagnostic with correct range", () => {
-      const diagnostics = getSourceFileDiagnostics(["// ::SPOOL:: foo(#car)"].join("\n"));
+  describe("when the source contains a malformed annotation", () => {
+    test("returns a diagnostic with the correct range and message", () => {
+      const diagnostics = getSourceFileDiagnostics("// ::SPOOL:: foo(#car)");
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
@@ -33,9 +35,13 @@ describe("getSourceFileDiagnostics", () => {
         },
       ]);
     });
+  });
 
-    test("unclosed passage produces diagnostic with zero-length range", () => {
-      const diagnostics = getSourceFileDiagnostics(["// ::SPOOL:: start(#car)", "code"].join("\n"));
+  describe("when the source contains an unclosed passage", () => {
+    test("returns a diagnostic with a zero-length range", () => {
+      const diagnostics = getSourceFileDiagnostics(
+        ["// ::SPOOL:: start(#car)", "code"].join("\n"),
+      );
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
@@ -48,8 +54,10 @@ describe("getSourceFileDiagnostics", () => {
         },
       ]);
     });
+  });
 
-    test("error on second line has correct line index", () => {
+  describe("when the annotation is on the second line", () => {
+    test("returns a diagnostic with the correct line index", () => {
       const diagnostics = getSourceFileDiagnostics(
         ["normal code", "// ::SPOOL:: bad(#car)"].join("\n"),
       );
@@ -69,24 +77,12 @@ describe("getSourceFileDiagnostics", () => {
 });
 
 describe("getDocFileDiagnostics", () => {
-  describe("valid references", () => {
-    test("reference found in registry returns no diagnostics", () => {
+  describe("when the reference resolves to a known passage", () => {
+    test("returns no diagnostics", () => {
       const registry: PassageRegistry = new Map([["src/car.ts:car", "export class Car {}"]]);
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["// ::SPOOL:: <<car.ts#car>>"].join("\n"),
-        registry,
-        templateRegistry,
-        "src",
-      );
-      expect(diagnostics).toEqual([]);
-    });
-
-    test("no-expand-nested found in templateRegistry returns no diagnostics", () => {
-      const registry: PassageRegistry = new Map();
-      const templateRegistry: PassageTemplateRegistry = new Map([["src/car.ts:car", "code"]]);
-      const diagnostics = getDocFileDiagnostics(
-        ["// ::SPOOL:: <<car.ts#car:no-expand-nested>>"].join("\n"),
+        "// ::SPOOL:: <<car.ts#car>>",
         registry,
         templateRegistry,
         "src",
@@ -95,12 +91,26 @@ describe("getDocFileDiagnostics", () => {
     });
   });
 
-  describe("invalid references", () => {
-    test("file not in registry produces 'Unknown file' diagnostic", () => {
+  describe("when a no-expand-nested reference resolves in the templateRegistry", () => {
+    test("returns no diagnostics", () => {
+      const registry: PassageRegistry = new Map();
+      const templateRegistry: PassageTemplateRegistry = new Map([["src/car.ts:car", "code"]]);
+      const diagnostics = getDocFileDiagnostics(
+        "// ::SPOOL:: <<car.ts#car:no-expand-nested>>",
+        registry,
+        templateRegistry,
+        "src",
+      );
+      expect(diagnostics).toEqual([]);
+    });
+  });
+
+  describe("when the referenced file is not in the registry", () => {
+    test("returns an 'Unknown file' diagnostic", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["// ::SPOOL:: <<car.ts#car>>"].join("\n"),
+        "// ::SPOOL:: <<car.ts#car>>",
         registry,
         templateRegistry,
         "src",
@@ -117,12 +127,14 @@ describe("getDocFileDiagnostics", () => {
         },
       ]);
     });
+  });
 
-    test("file in registry but passage missing produces 'Unknown passage ID' diagnostic", () => {
+  describe("when the file is in the registry but the passage is not", () => {
+    test("returns an 'Unknown passage ID' diagnostic", () => {
       const registry: PassageRegistry = new Map([["src/car.ts:boat", "code"]]);
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["// ::SPOOL:: <<car.ts#car>>"].join("\n"),
+        "// ::SPOOL:: <<car.ts#car>>",
         registry,
         templateRegistry,
         "src",
@@ -139,12 +151,14 @@ describe("getDocFileDiagnostics", () => {
         },
       ]);
     });
+  });
 
-    test("unknown modifier produces diagnostic", () => {
+  describe("when the reference uses an unknown modifier", () => {
+    test("returns an 'Unknown modifier' diagnostic", () => {
       const registry: PassageRegistry = new Map([["src/car.ts:car", "code"]]);
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["// ::SPOOL:: <<car.ts#car:bad-modifier>>"].join("\n"),
+        "// ::SPOOL:: <<car.ts#car:bad-modifier>>",
         registry,
         templateRegistry,
         "src",
@@ -161,12 +175,14 @@ describe("getDocFileDiagnostics", () => {
         },
       ]);
     });
+  });
 
-    test("no-expand-nested with file not in templateRegistry produces 'Unknown file' diagnostic", () => {
+  describe("when a no-expand-nested reference file is not in the templateRegistry", () => {
+    test("returns an 'Unknown file' diagnostic", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["// ::SPOOL:: <<car.ts#car:no-expand-nested>>"].join("\n"),
+        "// ::SPOOL:: <<car.ts#car:no-expand-nested>>",
         registry,
         templateRegistry,
         "src",
@@ -183,12 +199,14 @@ describe("getDocFileDiagnostics", () => {
         },
       ]);
     });
+  });
 
-    test("malformed reference produces diagnostic", () => {
+  describe("when the reference is malformed", () => {
+    test("returns a parse error diagnostic", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["// ::SPOOL:: <<sadlkj>>"].join("\n"),
+        "// ::SPOOL:: <<sadlkj>>",
         registry,
         templateRegistry,
         "src",
@@ -205,8 +223,10 @@ describe("getDocFileDiagnostics", () => {
         },
       ]);
     });
+  });
 
-    test("reference on second line has correct line index", () => {
+  describe("when the reference is on the second line", () => {
+    test("returns a diagnostic with the correct line index", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
