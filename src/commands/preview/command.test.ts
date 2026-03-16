@@ -129,6 +129,60 @@ describe("previewCommand", () => {
       }));
   });
 
+  describe("when a markdown file in a subdirectory contains relative links", () => {
+    test("rewrites relative links to be root-relative", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/foo/bar.md", "[go to baz](./baz.md)");
+        await createFile(root, "docs/foo/baz.md", "# Baz");
+
+        const { server } = await previewCommand({ cwd: root, stdout: makeWritable(), port: "0" });
+        try {
+          const res = await fetch(`http://localhost:${server.port}/foo/bar.md`);
+          const html = await res.text();
+          expect(html).toContain('href="/foo/baz.md"');
+        } finally {
+          await server.stop();
+        }
+      }));
+
+    test("does not rewrite absolute links", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/foo/bar.md", "[external](https://example.com)");
+
+        const { server } = await previewCommand({ cwd: root, stdout: makeWritable(), port: "0" });
+        try {
+          const res = await fetch(`http://localhost:${server.port}/foo/bar.md`);
+          const html = await res.text();
+          expect(html).toContain('href="https://example.com"');
+        } finally {
+          await server.stop();
+        }
+      }));
+  });
+
+  describe("when a directory index contains relative links", () => {
+    test("rewrites relative links relative to the index file's directory", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/foo/index.md", "[go to bar](./bar.md)");
+        await createFile(root, "docs/foo/bar.md", "# Bar");
+
+        const { server } = await previewCommand({ cwd: root, stdout: makeWritable(), port: "0" });
+        try {
+          const res = await fetch(`http://localhost:${server.port}/foo`);
+          const html = await res.text();
+          expect(html).toContain('href="/foo/bar.md"');
+        } finally {
+          await server.stop();
+        }
+      }));
+  });
+
   describe("when a directory path is requested and no index.md exists inside it", () => {
     test("responds with 404", () =>
       withTempDir(async (root) => {

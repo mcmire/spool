@@ -1,7 +1,7 @@
 import { watch } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join, extname } from "node:path";
-import { marked } from "marked";
+import { join, extname, dirname, posix } from "node:path";
+import { marked, Renderer } from "marked";
 import { findProjectRoot, loadConfig } from "../../config.ts";
 import { weaveProject } from "../../weaver.ts";
 
@@ -16,6 +16,24 @@ export type PreviewCommandOptions = {
 export type PreviewCommandResult = {
   server: { port: number | undefined; stop(): Promise<void> };
 };
+
+function makeRenderer(filePathname: string): Renderer {
+  const fileDir = posix.dirname(filePathname);
+  const renderer = new Renderer();
+  renderer.link = ({ href, title, text }) => {
+    if (
+      href &&
+      !href.startsWith("/") &&
+      !href.startsWith("#") &&
+      !/^[a-z][a-z+\-.]*:/i.test(href)
+    ) {
+      href = posix.join(fileDir, href);
+    }
+    const titleAttr = title ? ` title="${title}"` : "";
+    return `<a href="${href}"${titleAttr}>${text}</a>`;
+  };
+  return renderer;
+}
 
 function htmlShell(title: string, body: string): string {
   return `<!DOCTYPE html>
@@ -85,7 +103,7 @@ export async function previewCommand({
     try {
       if (extname(filePath) === ".md") {
         const content = await readFile(filePath, "utf-8");
-        const html = await marked(content);
+        const html = await marked(content, { renderer: makeRenderer(pathname) });
         return new Response(htmlShell(pathname, html), {
           headers: { "Content-Type": "text/html" },
         });
@@ -101,7 +119,8 @@ export async function previewCommand({
       const indexFile = Bun.file(indexPath);
       if (await indexFile.exists()) {
         const content = await readFile(indexPath, "utf-8");
-        const html = await marked(content);
+        const indexPathname = posix.join(pathname === "/" ? "" : pathname, "index.md");
+        const html = await marked(content, { renderer: makeRenderer(indexPathname) });
         return new Response(htmlShell(pathname, html), {
           headers: { "Content-Type": "text/html" },
         });
