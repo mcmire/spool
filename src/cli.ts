@@ -47,8 +47,14 @@ program
   .option("-p, --port <port>", "Port to listen on", "4567")
   .action(async (options: { port?: string }) => {
     const { previewCommand } = await import("./commands/preview/command.ts");
-    const { server } = await previewCommand({ cwd: process.cwd(), stdout: process.stdout, ...options });
-    process.on("SIGINT", () => { server.stop(); });
+    const { server } = await previewCommand({
+      cwd: process.cwd(),
+      stdout: process.stdout,
+      ...options,
+    });
+    process.on("SIGINT", () => {
+      server.stop();
+    });
   });
 
 program

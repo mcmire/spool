@@ -68,8 +68,6 @@ async function spawnCLI(
   return { proc, readLine };
 }
 
-
-
 describe("spool weave", () => {
   describe("when the project has no errors", () => {
     test("exits 0 and writes a summary to stdout", () =>

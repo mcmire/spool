@@ -39,9 +39,7 @@ describe("getSourceFileDiagnostics", () => {
 
   describe("when the source contains an unclosed passage", () => {
     test("returns a diagnostic with a zero-length range", () => {
-      const diagnostics = getSourceFileDiagnostics(
-        ["// ::SPOOL:: start(#car)", "code"].join("\n"),
-      );
+      const diagnostics = getSourceFileDiagnostics(["// ::SPOOL:: start(#car)", "code"].join("\n"));
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,

@@ -1,7 +1,13 @@
 import { test, expect, describe, mock, afterEach, beforeEach, jest } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { withTempDir, flushMacrotasks, createFile, writeConfig, makeWritable } from "../../../tests/helpers.ts";
+import {
+  withTempDir,
+  flushMacrotasks,
+  createFile,
+  writeConfig,
+  makeWritable,
+} from "../../../tests/helpers.ts";
 
 type WatchListener = (event: string, filename: string | null) => void;
 const mockWatch = mock((_path: string, _options: unknown, _listener: WatchListener) => {});

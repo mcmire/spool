@@ -86,12 +86,8 @@ export function startServer(): void {
   function getHandlers(): ServerHandlers | null {
     if (!projectRoot || !config) return null;
     if (!handlers) {
-      handlers = createServerHandlers(
-        projectRoot,
-        config,
-        registry,
-        templateRegistry,
-        (params) => connection.sendDiagnostics(params),
+      handlers = createServerHandlers(projectRoot, config, registry, templateRegistry, (params) =>
+        connection.sendDiagnostics(params),
       );
     }
     return handlers;
@@ -122,12 +118,8 @@ export function startServer(): void {
       registry = result.registry;
       templateRegistry = result.templateRegistry;
       // Recreate handlers with updated registries
-      handlers = createServerHandlers(
-        projectRoot,
-        config,
-        registry,
-        templateRegistry,
-        (params) => connection.sendDiagnostics(params),
+      handlers = createServerHandlers(projectRoot, config, registry, templateRegistry, (params) =>
+        connection.sendDiagnostics(params),
       );
     } catch (err) {
       connection.console.error(`Failed to rebuild registry: ${err}`);
