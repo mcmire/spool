@@ -1,7 +1,7 @@
 import { test, expect, describe, mock, afterEach, beforeEach, jest } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { withTempDir, flushMacrotasks } from "../../../tests/helpers.ts";
+import { withTempDir, flushMacrotasks, createFile, writeConfig, makeWritable } from "../../../tests/helpers.ts";
 
 type WatchListener = (event: string, filename: string | null) => void;
 const mockWatch = mock((_path: string, _options: unknown, _listener: WatchListener) => {});
@@ -16,32 +16,6 @@ const { previewCommand } = await import("./command.ts");
 afterEach(() => {
   mock.clearAllMocks();
 });
-
-function makeWritable(): { write(s: string): void; output: string } {
-  let output = "";
-  return {
-    write(s: string) {
-      output += s;
-    },
-    get output() {
-      return output;
-    },
-  };
-}
-
-async function createFile(root: string, relPath: string, content: string): Promise<void> {
-  const fullPath = join(root, relPath);
-  await mkdir(join(fullPath, ".."), { recursive: true });
-  await writeFile(fullPath, content, "utf-8");
-}
-
-async function writeConfig(root: string): Promise<void> {
-  await writeFile(
-    join(root, "spool.json"),
-    JSON.stringify({ source: { code: "src", docs: "docs" }, target: "out" }),
-    "utf-8",
-  );
-}
 
 describe("previewCommand", () => {
   describe("when the server starts successfully", () => {

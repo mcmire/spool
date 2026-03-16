@@ -1,7 +1,7 @@
 import { test, expect, describe } from "bun:test";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { withTempDir } from "../tests/helpers.ts";
+import { withTempDir, createFile, writeConfig } from "../tests/helpers.ts";
 
 const CLI = join(import.meta.dir, "cli.ts");
 
@@ -68,19 +68,7 @@ async function spawnCLI(
   return { proc, readLine };
 }
 
-async function createFile(root: string, relPath: string, content: string): Promise<void> {
-  const fullPath = join(root, relPath);
-  await mkdir(join(fullPath, ".."), { recursive: true });
-  await writeFile(fullPath, content, "utf-8");
-}
 
-async function writeConfig(root: string): Promise<void> {
-  await writeFile(
-    join(root, "spool.json"),
-    JSON.stringify({ source: { code: "src", docs: "docs" }, target: "out" }),
-    "utf-8",
-  );
-}
 
 describe("spool weave", () => {
   describe("when the project has no errors", () => {

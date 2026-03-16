@@ -3,24 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { buildRegistries } from "./registries.ts";
 import type { SpoolConfig } from "./config.ts";
-import { withTempDir } from "../tests/helpers.ts";
-
-async function createFile(dir: string, relPath: string, content: string): Promise<void> {
-  const fullPath = join(dir, relPath);
-  await mkdir(join(fullPath, ".."), { recursive: true });
-  await writeFile(fullPath, content, "utf-8");
-}
-
-function makeConfig(overrides?: Partial<SpoolConfig["source"]>): SpoolConfig {
-  return {
-    source: {
-      code: "src",
-      docs: "docs",
-      ...overrides,
-    },
-    target: "out",
-  };
-}
+import { withTempDir, createFile, makeConfig } from "../tests/helpers.ts";
 
 describe("buildRegistries", () => {
   describe("when a source file has annotated passages", () => {

@@ -1,22 +1,8 @@
 import { test, expect, describe } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { lintProject } from "./lint-project.ts";
-import type { SpoolConfig } from "../../config.ts";
-import { withTempDir } from "../../../tests/helpers.ts";
-
-function makeConfig(overrides?: Partial<SpoolConfig["source"]>): SpoolConfig {
-  return {
-    source: { code: "src", docs: "docs", ...overrides },
-    target: "out",
-  };
-}
-
-async function createFile(root: string, relPath: string, content: string): Promise<void> {
-  const fullPath = join(root, relPath);
-  await mkdir(join(fullPath, ".."), { recursive: true });
-  await writeFile(fullPath, content, "utf-8");
-}
+import { withTempDir, createFile, makeConfig } from "../../../tests/helpers.ts";
 
 describe("lintProject", () => {
   describe("when all references in doc files resolve to known passages", () => {

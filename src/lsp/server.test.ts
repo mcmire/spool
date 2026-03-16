@@ -6,13 +6,7 @@ import type { Diagnostic } from "vscode-languageserver/node.js";
 import { createServerHandlers } from "./server.ts";
 import type { PassageRegistry, PassageTemplateRegistry } from "../registries.ts";
 import type { SpoolConfig } from "../config.ts";
-
-function makeConfig(overrides?: Partial<SpoolConfig["source"]>): SpoolConfig {
-  return {
-    source: { code: "src", docs: "docs", ...overrides },
-    target: "out",
-  };
-}
+import { makeConfig } from "../../tests/helpers.ts";
 
 function makeHandlers(
   projectRoot: string,

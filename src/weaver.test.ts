@@ -1,10 +1,9 @@
 import { test, expect, describe } from "bun:test";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { weaveFile, weaveProject } from "./weaver.ts";
 import type { PassageRegistry, PassageTemplateRegistry } from "./registries.ts";
-import type { SpoolConfig } from "./config.ts";
-import { withTempDir } from "../tests/helpers.ts";
+import { withTempDir, createFile, makeConfig } from "../tests/helpers.ts";
 
 function makeRegistries(entries: Record<string, { registry: string; template?: string }>): {
   registry: PassageRegistry;
@@ -17,19 +16,6 @@ function makeRegistries(entries: Record<string, { registry: string; template?: s
     templateRegistry.set(key, template ?? r);
   }
   return { registry, templateRegistry };
-}
-
-function makeConfig(overrides?: Partial<SpoolConfig["source"]>): SpoolConfig {
-  return {
-    source: { code: "src", docs: "docs", ...overrides },
-    target: "out",
-  };
-}
-
-async function createFile(root: string, relPath: string, content: string): Promise<void> {
-  const fullPath = join(root, relPath);
-  await mkdir(join(fullPath, ".."), { recursive: true });
-  await writeFile(fullPath, content, "utf-8");
 }
 
 describe("weaveFile", () => {

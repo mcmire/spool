@@ -1,34 +1,8 @@
 import { test, expect, describe } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { lintCommand } from "./command.ts";
-import { withTempDir } from "../../../tests/helpers.ts";
-
-function makeWritable(): { write(s: string): void; output: string } {
-  let output = "";
-  return {
-    write(s: string) {
-      output += s;
-    },
-    get output() {
-      return output;
-    },
-  };
-}
-
-async function createFile(root: string, relPath: string, content: string): Promise<void> {
-  const fullPath = join(root, relPath);
-  await mkdir(join(fullPath, ".."), { recursive: true });
-  await writeFile(fullPath, content, "utf-8");
-}
-
-async function writeConfig(root: string): Promise<void> {
-  await writeFile(
-    join(root, "spool.json"),
-    JSON.stringify({ source: { code: "src", docs: "docs" }, target: "out" }),
-    "utf-8",
-  );
-}
+import { withTempDir, createFile, writeConfig, makeWritable } from "../../../tests/helpers.ts";
 
 describe("lintCommand", () => {
   describe("when there are no errors", () => {
