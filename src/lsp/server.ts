@@ -17,6 +17,61 @@ import { getSourceFileDiagnostics, getDocFileDiagnostics } from "./diagnostics.t
 import packageJson from "../../package.json" with { type: "json" };
 const { version } = packageJson;
 
+type SendDiagnostics = (params: { uri: string; diagnostics: Diagnostic[] }) => void;
+
+export type ServerHandlers = {
+  isSourceFile(filePath: string): boolean;
+  isDocFile(filePath: string): boolean;
+  getDiagnostics(filePath: string, content: string): Diagnostic[];
+  validateDocument(uri: string, content: string): void;
+};
+
+export function createServerHandlers(
+  projectRoot: string,
+  config: SpoolConfig,
+  registry: PassageRegistry,
+  templateRegistry: PassageTemplateRegistry,
+  sendDiagnostics: SendDiagnostics,
+): ServerHandlers {
+  function isSourceFile(filePath: string): boolean {
+    const sourceDir = join(projectRoot, config.source.code);
+    const docsDir = join(projectRoot, config.source.docs);
+    if (!filePath.startsWith(sourceDir) || filePath.startsWith(docsDir)) {
+      return false;
+    }
+    const relPath = relative(projectRoot, filePath);
+    const excludeGlobs = (config.source.excludeFromCode ?? []).map((p) => new Glob(p));
+    return !excludeGlobs.some((g) => g.match(relPath));
+  }
+
+  function isDocFile(filePath: string): boolean {
+    const docsDir = join(projectRoot, config.source.docs);
+    return filePath.startsWith(docsDir) && filePath.endsWith(".md");
+  }
+
+  function getDiagnostics(filePath: string, content: string): Diagnostic[] {
+    if (isSourceFile(filePath)) {
+      return getSourceFileDiagnostics(content);
+    } else if (isDocFile(filePath)) {
+      return getDocFileDiagnostics(content, registry, templateRegistry, config.source.code);
+    } else {
+      return [];
+    }
+  }
+
+  function validateDocument(uri: string, content: string): void {
+    let filePath: string;
+    try {
+      filePath = fileURLToPath(uri);
+    } catch {
+      return;
+    }
+    sendDiagnostics({ uri, diagnostics: getDiagnostics(filePath, content) });
+  }
+
+  return { isSourceFile, isDocFile, getDiagnostics, validateDocument };
+}
+
 export function startServer(): void {
   const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
   const documents = new TextDocuments(TextDocument);
@@ -26,6 +81,21 @@ export function startServer(): void {
   let registry: PassageRegistry = new Map();
   let templateRegistry: PassageTemplateRegistry = new Map();
   let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
+  let handlers: ServerHandlers | null = null;
+
+  function getHandlers(): ServerHandlers | null {
+    if (!projectRoot || !config) return null;
+    if (!handlers) {
+      handlers = createServerHandlers(
+        projectRoot,
+        config,
+        registry,
+        templateRegistry,
+        (params) => connection.sendDiagnostics(params),
+      );
+    }
+    return handlers;
+  }
 
   connection.onInitialize(async (_params): Promise<InitializeResult> => {
     projectRoot = findProjectRoot(process.cwd());
@@ -51,6 +121,14 @@ export function startServer(): void {
       const result = await buildRegistries(projectRoot, config);
       registry = result.registry;
       templateRegistry = result.templateRegistry;
+      // Recreate handlers with updated registries
+      handlers = createServerHandlers(
+        projectRoot,
+        config,
+        registry,
+        templateRegistry,
+        (params) => connection.sendDiagnostics(params),
+      );
     } catch (err) {
       connection.console.error(`Failed to rebuild registry: ${err}`);
     }
@@ -62,74 +140,37 @@ export function startServer(): void {
     }
     rebuildTimer = setTimeout(async () => {
       await rebuildRegistries();
-      // Re-validate all open documents after registry rebuild
       for (const doc of documents.all()) {
-        validateDocument(doc);
+        getHandlers()?.validateDocument(doc.uri, doc.getText());
       }
     }, 300);
   }
 
-  function getFilePath(uri: string): string | null {
+  documents.onDidChangeContent((change) => {
+    const h = getHandlers();
+    if (!h) return;
+    let filePath: string;
     try {
-      return fileURLToPath(uri);
+      filePath = fileURLToPath(change.document.uri);
     } catch {
-      return null;
-    }
-  }
-
-  function isSourceFile(filePath: string): boolean {
-    if (!projectRoot || !config) {
-      return false;
-    }
-    const sourceDir = join(projectRoot, config.source.code);
-    const docsDir = join(projectRoot, config.source.docs);
-    if (!filePath.startsWith(sourceDir) || filePath.startsWith(docsDir)) {
-      return false;
-    }
-    const relPath = relative(projectRoot, filePath);
-    const excludeGlobs = (config.source.excludeFromCode ?? []).map((p) => new Glob(p));
-    return !excludeGlobs.some((g) => g.match(relPath));
-  }
-
-  function isDocFile(filePath: string): boolean {
-    if (!projectRoot || !config) {
-      return false;
-    }
-    const docsDir = join(projectRoot, config.source.docs);
-    return filePath.startsWith(docsDir) && filePath.endsWith(".md");
-  }
-
-  function getDiagnostics(filePath: string, content: string): Diagnostic[] {
-    if (isSourceFile(filePath)) {
-      return getSourceFileDiagnostics(content);
-    } else if (isDocFile(filePath)) {
-      return getDocFileDiagnostics(content, registry, templateRegistry, config?.source.code ?? "");
-    } else {
-      return [];
-    }
-  }
-
-  function validateDocument(document: TextDocument): void {
-    const filePath = getFilePath(document.uri);
-    if (!filePath || !projectRoot || !config) {
       return;
     }
-
-    const diagnostics = getDiagnostics(filePath, document.getText());
-    connection.sendDiagnostics({ uri: document.uri, diagnostics });
-  }
-
-  documents.onDidChangeContent((change) => {
-    const filePath = getFilePath(change.document.uri);
-    if (filePath && isSourceFile(filePath)) {
+    if (h.isSourceFile(filePath)) {
       scheduleRebuild();
     }
-    validateDocument(change.document);
+    h.validateDocument(change.document.uri, change.document.getText());
   });
 
   documents.onDidSave((change) => {
-    const filePath = getFilePath(change.document.uri);
-    if (filePath && isSourceFile(filePath)) {
+    const h = getHandlers();
+    if (!h) return;
+    let filePath: string;
+    try {
+      filePath = fileURLToPath(change.document.uri);
+    } catch {
+      return;
+    }
+    if (h.isSourceFile(filePath)) {
       scheduleRebuild();
     }
   });
