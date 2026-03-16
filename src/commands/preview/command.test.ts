@@ -236,6 +236,11 @@ describe("previewCommand", () => {
             expect(jest.getTimerCount()).toBe(1);
 
             await jest.advanceTimersByTime(200);
+            // Two flushes are needed here because the live Bun.serve server adds
+            // an extra async hop compared to weaveProject alone — one flush drains
+            // the I/O callbacks from weaveProject, the second drains those from the
+            // server's internal response handling.
+            await flushMacrotasks();
             await flushMacrotasks();
 
             expect(stdout.output).toBe(initialOutput + "Re-wove: 1 file(s) written.\n");
