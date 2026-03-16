@@ -109,6 +109,34 @@ describe("previewCommand", () => {
       }));
   });
 
+  describe("when the default port is already in use", () => {
+    test("binds to the next available port", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/guide.md", "# Guide");
+
+        // Occupy a known port so previewCommand is forced to try the next one
+        const blocker = Bun.serve({ port: 0, fetch: async () => new Response("blocked") });
+        const blockedPort = blocker.port!;
+
+        try {
+          const { server } = await previewCommand({
+            cwd: root,
+            stdout: makeWritable(),
+            port: String(blockedPort),
+          });
+          try {
+            expect(server.port).toBe(blockedPort + 1);
+          } finally {
+            await server.stop();
+          }
+        } finally {
+          await blocker.stop();
+        }
+      }));
+  });
+
   describe("when the watch option is set", () => {
     test("calls watch on the source directory with recursive: true", () =>
       withTempDir(async (root) => {
