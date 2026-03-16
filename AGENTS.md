@@ -51,6 +51,10 @@ src/
 dist/                     # Compiled output (tsc); mirrors src/ structure
 ```
 
+## Formatting
+
+After updating a batch of files, run `bun fmt` to format them all before moving on.
+
 ## Writing tests
 
 Tests use `bun:test`. Run them with `bun test`.
