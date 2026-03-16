@@ -1,6 +1,7 @@
 import { test, expect, describe } from "bun:test";
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { realpathSync } from "node:fs";
 import { withTempDir, createFile, writeConfig } from "../tests/helpers.ts";
 
 const CLI = join(import.meta.dir, "cli.ts");
@@ -184,6 +185,254 @@ describe("spool lint", () => {
         expect(exitCode).toBe(1);
         expect(stderr).toContain("Passage reference errors:");
         expect(stderr).toContain("Unknown reference");
+      }));
+  });
+});
+
+describe("spool lsp", () => {
+  function encodeMessage(msg: unknown): Buffer {
+    const body = JSON.stringify(msg);
+    const header = `Content-Length: ${Buffer.byteLength(body, "utf-8")}\r\n\r\n`;
+    return Buffer.concat([Buffer.from(header, "ascii"), Buffer.from(body, "utf-8")]);
+  }
+
+  type JsonRpcMessage = Record<string, unknown>;
+
+  async function startLspClient(root: string): Promise<{
+    proc: ReturnType<typeof Bun.spawn>;
+    send(msg: unknown): void;
+    readMessage(): Promise<JsonRpcMessage>;
+    readNotification(method: string): Promise<JsonRpcMessage>;
+  }> {
+    const proc = Bun.spawn(["bun", "run", CLI, "lsp"], {
+      cwd: root,
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const reader = proc.stdout.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let raw = "";
+
+    async function readMessage(): Promise<JsonRpcMessage> {
+      while (true) {
+        const headerEnd = raw.indexOf("\r\n\r\n");
+        if (headerEnd !== -1) {
+          const header = raw.slice(0, headerEnd);
+          const lengthMatch = header.match(/Content-Length:\s*(\d+)/i);
+          if (!lengthMatch) throw new Error(`No Content-Length in header: ${header}`);
+          const contentLength = parseInt(lengthMatch[1]!, 10);
+
+          // Collect body bytes
+          let bodyBuf = Buffer.from(raw.slice(headerEnd + 4), "utf-8");
+          while (bodyBuf.length < contentLength) {
+            const { done, value } = await reader.read();
+            if (done) throw new Error("Stream ended before body was complete");
+            bodyBuf = Buffer.concat([bodyBuf, Buffer.from(value)]);
+          }
+          raw = bodyBuf.slice(contentLength).toString("utf-8");
+          return JSON.parse(bodyBuf.slice(0, contentLength).toString("utf-8")) as JsonRpcMessage;
+        }
+
+        const { done, value } = await reader.read();
+        if (done) throw new Error("Stream ended before header was complete");
+        raw += decoder.decode(value, { stream: true });
+      }
+    }
+
+    function send(msg: unknown): void {
+      proc.stdin.write(encodeMessage(msg));
+    }
+
+    async function initialize(): Promise<void> {
+      send({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          processId: process.pid,
+          rootUri: null,
+          capabilities: {},
+        },
+      });
+      // Wait for the initialize response
+      const response = await readMessage();
+      if (response["id"] !== 1) throw new Error(`Unexpected response: ${JSON.stringify(response)}`);
+      // Send initialized notification
+      send({ jsonrpc: "2.0", method: "initialized", params: {} });
+    }
+
+    await initialize();
+    // Allow time for onInitialized to rebuild registries
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    async function readNotification(method: string): Promise<JsonRpcMessage> {
+      while (true) {
+        const msg = await readMessage();
+        if (msg["method"] === method) return msg;
+      }
+    }
+
+    return { proc, send, readMessage, readNotification };
+  }
+
+  describe("when a doc file is changed with an unknown reference", () => {
+    test("sends publishDiagnostics with an error for the unknown passage", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/guide.md", "# Guide");
+
+        const realRoot = realpathSync(root);
+        const client = await startLspClient(root);
+        try {
+          const docUri = `file://${realRoot}/docs/guide.md`;
+
+          client.send({
+            jsonrpc: "2.0",
+            method: "textDocument/didOpen",
+            params: {
+              textDocument: {
+                uri: docUri,
+                languageId: "markdown",
+                version: 1,
+                text: "::SPOOL:: <<car.ts#missing>>",
+              },
+            },
+          });
+
+          const notification = await client.readNotification("textDocument/publishDiagnostics");
+
+          const params = notification["params"] as {
+            uri: string;
+            diagnostics: { message: string }[];
+          };
+          expect(params.uri).toBe(docUri);
+          expect(params.diagnostics).toHaveLength(1);
+          expect(params.diagnostics[0]!.message).toContain("Unknown file");
+        } finally {
+          client.proc.kill();
+          await client.proc.exited;
+        }
+      }));
+  });
+
+  describe("when a doc file is changed to fix all errors", () => {
+    test("sends publishDiagnostics with an empty diagnostics array", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/guide.md", "# Guide");
+
+        const realRoot = realpathSync(root);
+        const client = await startLspClient(root);
+        try {
+          const docUri = `file://${realRoot}/docs/guide.md`;
+
+          client.send({
+            jsonrpc: "2.0",
+            method: "textDocument/didOpen",
+            params: {
+              textDocument: {
+                uri: docUri,
+                languageId: "markdown",
+                version: 1,
+                text: "# Guide — no references here",
+              },
+            },
+          });
+
+          const notification = await client.readNotification("textDocument/publishDiagnostics");
+
+          const params = notification["params"] as {
+            uri: string;
+            diagnostics: unknown[];
+          };
+          expect(params.uri).toBe(docUri);
+          expect(params.diagnostics).toHaveLength(0);
+        } finally {
+          client.proc.kill();
+          await client.proc.exited;
+        }
+      }));
+  });
+
+  describe("when a source file is saved", () => {
+    test("sends publishDiagnostics for the open doc after the registry rebuilds", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await createFile(
+          root,
+          "src/car.ts",
+          ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
+        );
+        await createFile(root, "docs/guide.md", "::SPOOL:: <<car.ts#car>>");
+
+        const realRoot = realpathSync(root);
+        const client = await startLspClient(root);
+        try {
+          const docUri = `file://${realRoot}/docs/guide.md`;
+          const srcUri = `file://${realRoot}/src/car.ts`;
+
+          // Open the doc file — registry is already populated at startup
+          client.send({
+            jsonrpc: "2.0",
+            method: "textDocument/didOpen",
+            params: {
+              textDocument: {
+                uri: docUri,
+                languageId: "markdown",
+                version: 1,
+                text: "::SPOOL:: <<car.ts#car>>",
+              },
+            },
+          });
+
+          // Consume the initial diagnostics notification for the doc file
+          const initial = await client.readNotification("textDocument/publishDiagnostics");
+          const initialParams = initial["params"] as { diagnostics: unknown[] };
+          expect(initialParams.diagnostics).toHaveLength(0);
+
+          // Also open the source file so the server tracks it in TextDocuments
+          client.send({
+            jsonrpc: "2.0",
+            method: "textDocument/didOpen",
+            params: {
+              textDocument: {
+                uri: srcUri,
+                languageId: "typescript",
+                version: 1,
+                text: ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join(
+                  "\n",
+                ),
+              },
+            },
+          });
+          // Consume the diagnostics sent for the source file open
+          await client.readNotification("textDocument/publishDiagnostics");
+
+          // Save the source file — should trigger a registry rebuild then re-validate open docs
+          client.send({
+            jsonrpc: "2.0",
+            method: "textDocument/didSave",
+            params: {
+              textDocument: { uri: srcUri },
+            },
+          });
+
+          // After the 300ms debounce the server re-validates all open docs
+          const revalidated = await client.readNotification("textDocument/publishDiagnostics");
+          const revalidatedParams = revalidated["params"] as {
+            uri: string;
+            diagnostics: unknown[];
+          };
+          expect(revalidatedParams.uri).toBe(docUri);
+          expect(revalidatedParams.diagnostics).toHaveLength(0);
+        } finally {
+          client.proc.kill();
+          await client.proc.exited;
+        }
       }));
   });
 });
