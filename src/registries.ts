@@ -63,11 +63,25 @@ export async function buildRegistries(
         continue;
       }
 
-      const { passages, passageNestedRefs, errors } = parseSourcePassages(content);
+      const { passages, passageNestedRefs, wholeFile, wholeFileNestedRefs, errors } =
+        parseSourcePassages(content);
 
       if (errors.length > 0) {
         allErrors.push({ filePath: relPath, errors });
       }
+
+      // Register the whole-file entry (keyed with an empty passage name).
+      const wholeFileKey = `${relPath}:`;
+      registry.set(wholeFileKey, wholeFile);
+      if (wholeFileNestedRefs.length > 0) {
+        templateRegistry.set(
+          wholeFileKey,
+          buildTemplateContent(wholeFile.split("\n"), wholeFileNestedRefs, relPath),
+        );
+      } else {
+        templateRegistry.set(wholeFileKey, wholeFile);
+      }
+
       for (const [name, value] of passages) {
         const key = `${relPath}:${name}`;
         registry.set(key, value);

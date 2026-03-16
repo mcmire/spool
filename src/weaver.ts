@@ -25,7 +25,10 @@ export function weaveFile(
       });
       continue;
     }
-    const key = `${posix.join(sourceDir, ref.filePath)}:${ref.passageName}`;
+    const key =
+      ref.passageName !== undefined
+        ? `${posix.join(sourceDir, ref.filePath)}:${ref.passageName}`
+        : `${posix.join(sourceDir, ref.filePath)}:`;
     const source = ref.modifier === "no-expand-nested" ? templateRegistry : registry;
     const passageContent = source.get(key);
     if (passageContent === undefined) {

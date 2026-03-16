@@ -181,6 +181,88 @@ describe("parseSourcePassages", () => {
     });
   });
 
+  describe("wholeFile output", () => {
+    test("plain file with no annotations returns the full content", () => {
+      const { wholeFile, wholeFileNestedRefs, errors } = parseSourcePassages(
+        "const x = 1;\nconst y = 2;",
+      );
+      expect(errors).toEqual([]);
+      expect(wholeFile).toBe("const x = 1;\nconst y = 2;");
+      expect(wholeFileNestedRefs).toEqual([]);
+    });
+
+    test("annotation marker lines are stripped from wholeFile", () => {
+      const { wholeFile } = parseSourcePassages(
+        ["// ::SPOOL:: start(#car)", "export class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
+      );
+      expect(wholeFile).toBe("export class Car {}");
+    });
+
+    test("ignored lines and ignore markers are stripped from wholeFile", () => {
+      const { wholeFile } = parseSourcePassages(
+        ["before", "// ::SPOOL:: ignore-start", "hidden", "// ::SPOOL:: ignore-end", "after"].join(
+          "\n",
+        ),
+      );
+      expect(wholeFile).toBe("before\nafter");
+    });
+
+    test("ignore-next target line is stripped from wholeFile", () => {
+      const { wholeFile } = parseSourcePassages(
+        ["before", "// ::SPOOL:: ignore-next", "skipped", "after"].join("\n"),
+      );
+      expect(wholeFile).toBe("before\nafter");
+    });
+
+    test("top-level passages are tracked as wholeFileNestedRefs", () => {
+      const { wholeFile, wholeFileNestedRefs, errors } = parseSourcePassages(
+        [
+          "preamble",
+          "// ::SPOOL:: start(#car)",
+          "class Car {}",
+          "// ::SPOOL:: end(#car)",
+          "epilogue",
+        ].join("\n"),
+      );
+      expect(errors).toEqual([]);
+      expect(wholeFile).toBe("preamble\nclass Car {}\nepilogue");
+      expect(wholeFileNestedRefs).toEqual([{ name: "car", prefix: "// ", startIdx: 1, endIdx: 2 }]);
+    });
+
+    test("multiple top-level passages are all tracked in wholeFileNestedRefs", () => {
+      const { wholeFileNestedRefs } = parseSourcePassages(
+        [
+          "// ::SPOOL:: start(#a)",
+          "class A {}",
+          "// ::SPOOL:: end(#a)",
+          "// ::SPOOL:: start(#b)",
+          "class B {}",
+          "// ::SPOOL:: end(#b)",
+        ].join("\n"),
+      );
+      expect(wholeFileNestedRefs).toEqual([
+        { name: "a", prefix: "// ", startIdx: 0, endIdx: 1 },
+        { name: "b", prefix: "// ", startIdx: 1, endIdx: 2 },
+      ]);
+    });
+
+    test("nested passages do not appear as separate wholeFileNestedRefs entries", () => {
+      const { wholeFileNestedRefs } = parseSourcePassages(
+        [
+          "// ::SPOOL:: start(#outer)",
+          "line a",
+          "// ::SPOOL:: start(#inner)",
+          "line b",
+          "// ::SPOOL:: end(#inner)",
+          "line c",
+          "// ::SPOOL:: end(#outer)",
+        ].join("\n"),
+      );
+      expect(wholeFileNestedRefs).toHaveLength(1);
+      expect(wholeFileNestedRefs[0]!.name).toBe("outer");
+    });
+  });
+
   describe("invalid annotations", () => {
     test("::SPOOL:: with no directive produces generic error", () => {
       const { errors } = parseSourcePassages(["// ::SPOOL::"].join("\n"));
@@ -354,6 +436,38 @@ describe("parsePassageReferences", () => {
       expect(errors).toEqual([]);
     });
 
+    test("whole-file reference with no passage ID", () => {
+      const { refs, errors } = parsePassageReferences(["// ::SPOOL:: <<src/cli.ts>>"].join("\n"));
+      expect(refs).toEqual([
+        {
+          filePath: "src/cli.ts",
+          passageName: undefined,
+          modifier: undefined,
+          line: 1,
+          column: 4,
+          raw: "::SPOOL:: <<src/cli.ts>>",
+        },
+      ]);
+      expect(errors).toEqual([]);
+    });
+
+    test("whole-file reference with modifier but no passage ID", () => {
+      const { refs, errors } = parsePassageReferences(
+        ["// ::SPOOL:: <<src/cli.ts:no-expand-nested>>"].join("\n"),
+      );
+      expect(refs).toEqual([
+        {
+          filePath: "src/cli.ts",
+          passageName: undefined,
+          modifier: "no-expand-nested",
+          line: 1,
+          column: 4,
+          raw: "::SPOOL:: <<src/cli.ts:no-expand-nested>>",
+        },
+      ]);
+      expect(errors).toEqual([]);
+    });
+
     test("non-reference lines are not affected", () => {
       const { refs, errors } = parsePassageReferences(
         ["just a normal line", "another line"].join("\n"),
@@ -371,19 +485,8 @@ describe("parsePassageReferences", () => {
           line: 1,
           column: 4,
           length: 9,
-          message: "Expected reference to match '::SPOOL:: <<file-path#passage-id>>'",
-        },
-      ]);
-    });
-
-    test("::SPOOL:: with no # separator produces error", () => {
-      const { errors } = parsePassageReferences(["// ::SPOOL:: <<sadlkj>>"].join("\n"));
-      expect(errors).toEqual([
-        {
-          line: 1,
-          column: 4,
-          length: 20,
-          message: "Expected reference to match '::SPOOL:: <<file-path#passage-id>>'",
+          message:
+            "Expected reference to match '::SPOOL:: <<file-path>>' or '::SPOOL:: <<file-path#passage-id>>'",
         },
       ]);
     });

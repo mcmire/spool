@@ -83,15 +83,61 @@ describe("buildRegistries", () => {
   });
 
   describe("when no files have annotated passages", () => {
-    test("returns empty registries", () =>
+    test("registers the whole-file entry for each source file", () =>
       withTempDir(async (root) => {
         await createFile(root, "src/plain.ts", "export const x = 1;\n");
 
         const { registry, templateRegistry, errors } = await buildRegistries(root, makeConfig());
 
         expect(errors).toEqual([]);
-        expect(registry.size).toBe(0);
-        expect(templateRegistry.size).toBe(0);
+        expect(registry.get("src/plain.ts:")).toBe("export const x = 1;\n");
+        expect(templateRegistry.get("src/plain.ts:")).toBe("export const x = 1;\n");
+      }));
+  });
+
+  describe("when a source file has annotated passages", () => {
+    test("stores a whole-file entry keyed with an empty passage name", () =>
+      withTempDir(async (root) => {
+        await createFile(
+          root,
+          "src/car.ts",
+          [
+            "preamble",
+            "// ::SPOOL:: start(#car)",
+            "class Car {}",
+            "// ::SPOOL:: end(#car)",
+            "epilogue",
+          ].join("\n"),
+        );
+
+        const { registry, errors } = await buildRegistries(root, makeConfig());
+
+        expect(errors).toEqual([]);
+        expect(registry.get("src/car.ts:")).toBe("preamble\nclass Car {}\nepilogue");
+      }));
+
+    test("templateRegistry whole-file entry replaces top-level passage blocks with references", () =>
+      withTempDir(async (root) => {
+        await createFile(
+          root,
+          "src/car.ts",
+          [
+            "preamble",
+            "// ::SPOOL:: start(#car)",
+            "class Car {}",
+            "// ::SPOOL:: end(#car)",
+            "epilogue",
+          ].join("\n"),
+        );
+
+        const { templateRegistry, errors } = await buildRegistries(root, makeConfig());
+
+        expect(errors).toEqual([]);
+        const tmpl = templateRegistry.get("src/car.ts:") ?? "";
+        expect(tmpl).toContain("::SPOOL:: <<src/car.ts#car>>");
+        expect(tmpl).toContain("preamble");
+        expect(tmpl).toContain("epilogue");
+        expect(tmpl).not.toContain("class Car {}");
       }));
   });
 

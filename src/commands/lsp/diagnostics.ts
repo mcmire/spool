@@ -78,12 +78,16 @@ export function getDocFileDiagnostics(
       continue;
     }
     const resolvedFilePath = posix.join(sourceDir, ref.filePath);
-    const key = `${resolvedFilePath}:${ref.passageName}`;
+    const key =
+      ref.passageName !== undefined
+        ? `${resolvedFilePath}:${ref.passageName}`
+        : `${resolvedFilePath}:`;
     const source = ref.modifier === "no-expand-nested" ? templateRegistry : registry;
     if (!source.has(key)) {
-      const message = fileExistsInRegistry(resolvedFilePath, source)
-        ? `Unknown passage ID "${ref.passageName}" in file ${resolvedFilePath}`
-        : `Unknown file: ${resolvedFilePath}`;
+      const message =
+        ref.passageName !== undefined && fileExistsInRegistry(resolvedFilePath, source)
+          ? `Unknown passage ID "${ref.passageName}" in file ${resolvedFilePath}`
+          : `Unknown file: ${resolvedFilePath}`;
       diagnostics.push({
         severity: DiagnosticSeverity.Error,
         range: {

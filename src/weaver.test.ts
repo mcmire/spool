@@ -79,6 +79,43 @@ describe("weaveFile", () => {
     });
   });
 
+  describe("when the doc contains a whole-file reference (no passage ID)", () => {
+    test("replaces that line with the full file content", () => {
+      const { registry, templateRegistry } = makeRegistries({
+        "src/cli.ts:": { registry: "const x = 1;\nconst y = 2;" },
+      });
+
+      const { output, errors } = weaveFile(
+        "// ::SPOOL:: <<cli.ts>>",
+        registry,
+        templateRegistry,
+        "src",
+      );
+
+      expect(errors).toEqual([]);
+      expect(output).toBe("const x = 1;\nconst y = 2;");
+    });
+
+    test("no-expand-nested reads from templateRegistry", () => {
+      const { registry, templateRegistry } = makeRegistries({
+        "src/cli.ts:": {
+          registry: "preamble\nclass Car {}\nepilogue",
+          template: "preamble\n// ::SPOOL:: <<src/cli.ts#car>>\nepilogue",
+        },
+      });
+
+      const { output, errors } = weaveFile(
+        "// ::SPOOL:: <<cli.ts:no-expand-nested>>",
+        registry,
+        templateRegistry,
+        "src",
+      );
+
+      expect(errors).toEqual([]);
+      expect(output).toBe("preamble\n// ::SPOOL:: <<src/cli.ts#car>>\nepilogue");
+    });
+  });
+
   describe("when a reference points to an unknown passage", () => {
     test("reports an error and leaves the line unchanged", () => {
       const { registry, templateRegistry } = makeRegistries({});
@@ -145,6 +182,26 @@ describe("weaveProject", () => {
 
         const result = await readFile(join(root, "out/guide.md"), "utf-8");
         expect(result).toBe("# Guide\nclass Car {}");
+      }));
+
+    test("whole-file reference expands to the full file content with passages expanded", () =>
+      withTempDir(async (root) => {
+        await createFile(
+          root,
+          "src/cli.ts",
+          [
+            "// ::SPOOL:: start(#setup)",
+            "const app = new App();",
+            "// ::SPOOL:: end(#setup)",
+            "app.run();",
+          ].join("\n"),
+        );
+        await createFile(root, "docs/guide.md", "# Guide\n// ::SPOOL:: <<cli.ts>>");
+
+        await weaveProject(root, makeConfig());
+
+        const result = await readFile(join(root, "out/guide.md"), "utf-8");
+        expect(result).toBe("# Guide\nconst app = new App();\napp.run();");
       }));
   });
 

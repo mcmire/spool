@@ -203,20 +203,16 @@ describe("getDocFileDiagnostics", () => {
     test("returns a parse error diagnostic", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
-      const diagnostics = getDocFileDiagnostics(
-        "// ::SPOOL:: <<sadlkj>>",
-        registry,
-        templateRegistry,
-        "src",
-      );
+      const diagnostics = getDocFileDiagnostics("// ::SPOOL::", registry, templateRegistry, "src");
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 23 },
+            end: { line: 0, character: 12 },
           },
-          message: "Expected reference to match '::SPOOL:: <<file-path#passage-id>>'",
+          message:
+            "Expected reference to match '::SPOOL:: <<file-path>>' or '::SPOOL:: <<file-path#passage-id>>'",
           source: "spool",
         },
       ]);

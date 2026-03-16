@@ -7,7 +7,7 @@ export type ParseError = {
 
 export type PassageReference = {
   filePath: string;
-  passageName: string;
+  passageName: string | undefined;
   modifier?: string;
   line: number;
   column: number;
@@ -28,7 +28,7 @@ export const VALID_MODIFIERS = new Set(["no-expand-nested"]);
 const SOURCE_ANNOTATION_RE = /^(.*?)(?:==\s*)?::SPOOL::\s+(start|end)\(#([\w-]+)\)(?:\s*==)?\s*$/;
 const SOURCE_DIRECTIVE_RE = /^.*?::SPOOL::\s+(\S+)/;
 const SOURCE_IGNORE_RE = /^.*?::SPOOL::\s+(ignore-start|ignore-end|ignore-next)\s*$/;
-const PASSAGE_REFERENCE_RE = /^(.*?)::SPOOL::\s+<<(.+?)#([\w-]+)(?::([\w-]+))?>>/;
+const PASSAGE_REFERENCE_RE = /^(.*?)::SPOOL::\s+<<(.+?)(?:#([\w-]+))?(?::([\w-]+))?>>/;
 
 function magicCommentError(line: string, lineNum: number): ParseError {
   const col = line.indexOf("::SPOOL::") + 1;
@@ -81,12 +81,18 @@ function magicCommentError(line: string, lineNum: number): ParseError {
 export function parseSourcePassages(content: string): {
   passages: Map<string, string>;
   passageNestedRefs: Map<string, NestedRef[]>;
+  wholeFile: string;
+  wholeFileNestedRefs: NestedRef[];
   errors: ParseError[];
 } {
   const passages = new Map<string, string>();
   const passageNestedRefs = new Map<string, NestedRef[]>();
   const errors: ParseError[] = [];
   const stack: Frame[] = [];
+  // Lines accumulated for the whole-file view (annotation markers and ignored lines stripped).
+  const wholeFileLines: string[] = [];
+  // Top-level passage refs tracked for the whole-file template.
+  const wholeFileNestedRefs: NestedRef[] = [];
   const lines = content.split("\n");
   let ignoring = false;
   let ignoreNext = false;
@@ -141,6 +147,9 @@ export function parseSourcePassages(content: string): {
           if (stack.length > 0) {
             const parent = stack[stack.length - 1]!;
             parent.nestedRefs[parent.nestedRefs.length - 1]!.endIdx = parent.lines.length;
+          } else {
+            // Top-level passage just closed — record its end in the whole-file refs.
+            wholeFileNestedRefs[wholeFileNestedRefs.length - 1]!.endIdx = wholeFileLines.length;
           }
         }
       } else {
@@ -159,6 +168,14 @@ export function parseSourcePassages(content: string): {
             startIdx: parent.lines.length,
             endIdx: -1,
           });
+        } else {
+          // Top-level passage opening — track it in the whole-file refs.
+          wholeFileNestedRefs.push({
+            name: passageName,
+            prefix,
+            startIdx: wholeFileLines.length,
+            endIdx: -1,
+          });
         }
         stack.push({ name: passageName, lines: [], nestedRefs: [] });
       }
@@ -168,6 +185,10 @@ export function parseSourcePassages(content: string): {
       for (const frame of stack) {
         frame.lines.push(line);
       }
+      // Only add to the whole-file view when not inside a passage that itself is
+      // nested inside another — i.e. always, since all frames share the same lines.
+      // We add every non-marker line to wholeFileLines regardless of stack depth.
+      wholeFileLines.push(line);
     }
   }
 
@@ -179,7 +200,13 @@ export function parseSourcePassages(content: string): {
     });
   }
 
-  return { passages, passageNestedRefs, errors };
+  return {
+    passages,
+    passageNestedRefs,
+    wholeFile: wholeFileLines.join("\n"),
+    wholeFileNestedRefs,
+    errors,
+  };
 }
 
 function malformedReferenceError(line: string, lineNum: number): ParseError {
@@ -190,7 +217,8 @@ function malformedReferenceError(line: string, lineNum: number): ParseError {
     line: lineNum,
     column: col,
     length,
-    message: "Expected reference to match '::SPOOL:: <<file-path#passage-id>>'",
+    message:
+      "Expected reference to match '::SPOOL:: <<file-path>>' or '::SPOOL:: <<file-path#passage-id>>'",
   };
 }
 
@@ -206,13 +234,21 @@ export function parsePassageReferences(content: string): {
     const line = lines[i]!;
     const match = PASSAGE_REFERENCE_RE.exec(line);
     if (match) {
+      const passageName = match[3];
       const modifier = match[4];
-      const raw = modifier
-        ? `::SPOOL:: <<${match[2]!}#${match[3]!}:${modifier}>>`
-        : `::SPOOL:: <<${match[2]!}#${match[3]!}>>`;
+      let raw: string;
+      if (passageName !== undefined && modifier !== undefined) {
+        raw = `::SPOOL:: <<${match[2]!}#${passageName}:${modifier}>>`;
+      } else if (passageName !== undefined) {
+        raw = `::SPOOL:: <<${match[2]!}#${passageName}>>`;
+      } else if (modifier !== undefined) {
+        raw = `::SPOOL:: <<${match[2]!}:${modifier}>>`;
+      } else {
+        raw = `::SPOOL:: <<${match[2]!}>>`;
+      }
       refs.push({
         filePath: match[2]!,
-        passageName: match[3]!,
+        passageName,
         modifier,
         line: i + 1,
         column: match[0]!.indexOf("::SPOOL::") + 1,
