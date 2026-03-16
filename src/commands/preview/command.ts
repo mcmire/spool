@@ -2,8 +2,20 @@ import { watch } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { marked } from "marked";
-import { findProjectRoot, loadConfig } from "../config.ts";
-import { weaveProject } from "../weaver.ts";
+import { findProjectRoot, loadConfig } from "../../config.ts";
+import { weaveProject } from "../../weaver.ts";
+
+type Writable = { write(s: string): void };
+
+export type PreviewCommandOptions = {
+  cwd: string;
+  stdout: Writable;
+  port?: string;
+};
+
+export type PreviewCommandResult = {
+  server: { port: number | undefined; stop(): Promise<void> };
+};
 
 function htmlShell(title: string, body: string): string {
   return `<!DOCTYPE html>
@@ -33,16 +45,19 @@ ${body}
 </html>`;
 }
 
-export async function previewCommand(options: { port?: string }): Promise<void> {
-  const projectRoot = findProjectRoot(process.cwd());
+export async function previewCommand({
+  cwd,
+  stdout,
+  port: portOption,
+}: PreviewCommandOptions): Promise<PreviewCommandResult> {
+  const projectRoot = findProjectRoot(cwd);
   const config = await loadConfig(projectRoot);
 
-  // Initial weave
   const result = await weaveProject(projectRoot, config);
-  console.log(`Initial weave: ${result.filesWritten} file(s) written.`);
+  stdout.write(`Initial weave: ${result.filesWritten} file(s) written.\n`);
 
   const targetDir = join(projectRoot, config.target);
-  const port = options.port ? parseInt(options.port, 10) : 4567;
+  const port = portOption ? parseInt(portOption, 10) : 4567;
 
   const server = Bun.serve({
     port,
@@ -72,9 +87,8 @@ export async function previewCommand(options: { port?: string }): Promise<void> 
     },
   });
 
-  console.log(`Preview server running at http://localhost:${server.port}`);
+  stdout.write(`Preview server running at http://localhost:${server.port}\n`);
 
-  // Watch for changes
   const sourceDir = join(projectRoot, config.source.code);
   const docsDir = join(projectRoot, config.source.docs);
 
@@ -87,9 +101,9 @@ export async function previewCommand(options: { port?: string }): Promise<void> 
     debounceTimer = setTimeout(async () => {
       try {
         const r = await weaveProject(projectRoot, config);
-        console.log(`Re-wove: ${r.filesWritten} file(s) written.`);
+        stdout.write(`Re-wove: ${r.filesWritten} file(s) written.\n`);
       } catch (err) {
-        console.error("Re-weave failed:", err);
+        stdout.write(`Re-weave failed: ${err}\n`);
       }
     }, 200);
   }
@@ -100,7 +114,6 @@ export async function previewCommand(options: { port?: string }): Promise<void> 
     }
   });
 
-  // Also watch docs dir if it's not inside source dir
   if (!docsDir.startsWith(sourceDir)) {
     watch(docsDir, { recursive: true }, (_event, filename) => {
       if (filename) {
@@ -108,4 +121,6 @@ export async function previewCommand(options: { port?: string }): Promise<void> 
       }
     });
   }
+
+  return { server };
 }
