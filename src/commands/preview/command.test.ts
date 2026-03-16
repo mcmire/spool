@@ -109,6 +109,43 @@ describe("previewCommand", () => {
       }));
   });
 
+  describe("when a directory path is requested and an index.md exists inside it", () => {
+    test("serves the index.md as HTML", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/foo/index.md", "# Foo Index");
+
+        const { server } = await previewCommand({ cwd: root, stdout: makeWritable(), port: "0" });
+        try {
+          const res = await fetch(`http://localhost:${server.port}/foo`);
+          const html = await res.text();
+          expect(res.status).toBe(200);
+          expect(res.headers.get("content-type")).toContain("text/html");
+          expect(html).toContain("<h1>Foo Index</h1>");
+        } finally {
+          await server.stop();
+        }
+      }));
+  });
+
+  describe("when a directory path is requested and no index.md exists inside it", () => {
+    test("responds with 404", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/guide.md", "# Guide");
+
+        const { server } = await previewCommand({ cwd: root, stdout: makeWritable(), port: "0" });
+        try {
+          const res = await fetch(`http://localhost:${server.port}/foo`);
+          expect(res.status).toBe(404);
+        } finally {
+          await server.stop();
+        }
+      }));
+  });
+
   describe("when the default port is already in use", () => {
     test("binds to the next available port", () =>
       withTempDir(async (root) => {

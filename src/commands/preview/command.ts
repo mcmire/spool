@@ -79,7 +79,7 @@ export async function previewCommand({
 
   const server = await startOnAvailablePort(startPort, async function fetch(req) {
     const url = new URL(req.url);
-    let pathname = url.pathname === "/" ? "/index.md" : url.pathname;
+    const pathname = url.pathname;
     const filePath = join(targetDir, pathname);
 
     try {
@@ -94,6 +94,17 @@ export async function previewCommand({
       const file = Bun.file(filePath);
       if (await file.exists()) {
         return new Response(file);
+      }
+
+      // No extension — try resolving as a directory index
+      const indexPath = join(filePath, "index.md");
+      const indexFile = Bun.file(indexPath);
+      if (await indexFile.exists()) {
+        const content = await readFile(indexPath, "utf-8");
+        const html = await marked(content);
+        return new Response(htmlShell(pathname, html), {
+          headers: { "Content-Type": "text/html" },
+        });
       }
 
       return new Response("Not found", { status: 404 });
