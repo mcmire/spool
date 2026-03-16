@@ -1,8 +1,8 @@
 import { DiagnosticSeverity } from "vscode-languageserver/node.js";
 import type { Diagnostic } from "vscode-languageserver/node.js";
 import { posix } from "node:path";
-import { parseSourcePassages, parsePassageReferences, VALID_MODIFIERS } from "../parser.ts";
-import type { PassageRegistry, PassageTemplateRegistry } from "../registries.ts";
+import { parseSourcePassages, parsePassageReferences, VALID_MODIFIERS } from "../../parser.ts";
+import type { PassageRegistry, PassageTemplateRegistry } from "../../registries.ts";
 
 export function getSourceFileDiagnostics(content: string): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];

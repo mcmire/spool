@@ -61,7 +61,7 @@ program
   .command("lsp")
   .description("Start the Language Server Protocol server")
   .action(async () => {
-    const { lspCommand } = await import("./commands/lsp.ts");
+    const { lspCommand } = await import("./commands/lsp/command.ts");
     lspCommand();
   });
 

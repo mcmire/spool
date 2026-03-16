@@ -1,4 +1,4 @@
-import { startServer } from "../lsp/server.ts";
+import { startServer } from "./server.ts";
 
 export function lspCommand(): void {
   startServer();

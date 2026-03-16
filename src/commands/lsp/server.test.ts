@@ -4,9 +4,9 @@ import { pathToFileURL } from "node:url";
 import { DiagnosticSeverity } from "vscode-languageserver/node.js";
 import type { Diagnostic } from "vscode-languageserver/node.js";
 import { createServerHandlers } from "./server.ts";
-import type { PassageRegistry, PassageTemplateRegistry } from "../registries.ts";
-import type { SpoolConfig } from "../config.ts";
-import { makeConfig } from "../../tests/helpers.ts";
+import type { PassageRegistry, PassageTemplateRegistry } from "../../registries.ts";
+import type { SpoolConfig } from "../../config.ts";
+import { makeConfig } from "../../../tests/helpers.ts";
 
 function makeHandlers(
   projectRoot: string,

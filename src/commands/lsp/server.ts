@@ -9,12 +9,12 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import { Glob } from "bun";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { findProjectRoot, loadConfig } from "../config.ts";
-import type { SpoolConfig } from "../config.ts";
-import { buildRegistries } from "../registries.ts";
-import type { PassageRegistry, PassageTemplateRegistry } from "../registries.ts";
+import { findProjectRoot, loadConfig } from "../../config.ts";
+import type { SpoolConfig } from "../../config.ts";
+import { buildRegistries } from "../../registries.ts";
+import type { PassageRegistry, PassageTemplateRegistry } from "../../registries.ts";
 import { getSourceFileDiagnostics, getDocFileDiagnostics } from "./diagnostics.ts";
-import packageJson from "../../package.json" with { type: "json" };
+import packageJson from "../../../package.json" with { type: "json" };
 const { version } = packageJson;
 
 type SendDiagnostics = (params: { uri: string; diagnostics: Diagnostic[] }) => void;
