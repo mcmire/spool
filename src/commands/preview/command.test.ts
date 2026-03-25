@@ -1,6 +1,7 @@
-import { test, expect, describe, mock, afterEach, beforeEach, jest } from "bun:test";
+import { test, expect, describe, vi, afterEach } from "vitest";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import * as http from "node:http";
 import {
   withTempDir,
   flushMacrotasks,
@@ -10,17 +11,17 @@ import {
 } from "../../../tests/helpers.ts";
 
 type WatchListener = (event: string, filename: string | null) => void;
-const mockWatch = mock((_path: string, _options: unknown, _listener: WatchListener) => {});
+const mockWatch = vi.fn((_path: string, _options: unknown, _listener: WatchListener) => {});
 
-mock.module("node:fs", () => ({
-  ...require("node:fs"),
+vi.mock("node:fs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:fs")>()),
   watch: mockWatch,
 }));
 
 const { previewCommand } = await import("./command.ts");
 
 afterEach(() => {
-  mock.clearAllMocks();
+  vi.clearAllMocks();
 });
 
 describe("previewCommand", () => {
@@ -208,8 +209,9 @@ describe("previewCommand", () => {
         await createFile(root, "docs/guide.md", "# Guide");
 
         // Occupy a known port so previewCommand is forced to try the next one
-        const blocker = Bun.serve({ port: 0, fetch: async () => new Response("blocked") });
-        const blockedPort = blocker.port!;
+        const blocker = http.createServer();
+        await new Promise<void>((resolve) => blocker.listen(0, "localhost", resolve));
+        const blockedPort = (blocker.address() as { port: number }).port;
 
         try {
           const { server } = await previewCommand({
@@ -223,7 +225,9 @@ describe("previewCommand", () => {
             await server.stop();
           }
         } finally {
-          await blocker.stop();
+          await new Promise<void>((resolve, reject) =>
+            blocker.close((err) => (err ? reject(err) : resolve())),
+          );
         }
       }));
   });
@@ -273,19 +277,11 @@ describe("previewCommand", () => {
         const { server } = await previewCommand({ cwd: root, stdout: makeWritable(), port: "0" });
         await server.stop();
 
-        const calledPaths = mockWatch.mock.calls.map((c) => c[0]);
+        const calledPaths = mockWatch.mock.calls.map((c: unknown[]) => c[0]);
         expect(calledPaths).not.toContain(join(root, "src/docs"));
       }));
 
     describe("when the watcher fires", () => {
-      beforeEach(() => {
-        jest.useFakeTimers();
-      });
-
-      afterEach(() => {
-        jest.useRealTimers();
-      });
-
       test("schedules a reweave with a 200ms debounce", () =>
         withTempDir(async (root) => {
           await writeConfig(root);
@@ -293,21 +289,29 @@ describe("previewCommand", () => {
           await createFile(root, "docs/guide.md", "# Guide");
 
           let capturedListener: WatchListener | null = null;
-          mockWatch.mockImplementation((_path, _options, listener) => {
-            capturedListener = listener;
-          });
+          mockWatch.mockImplementation(
+            (_path: string, _options: unknown, listener: WatchListener) => {
+              capturedListener = listener;
+            },
+          );
 
           const { server } = await previewCommand({ cwd: root, stdout: makeWritable(), port: "0" });
+          // Switch to fake timers only after previewCommand resolves. If fake timers were
+          // installed earlier, they would intercept the real async operations inside
+          // previewCommand (port binding, initial weave) and cause it to hang.
+          vi.useFakeTimers({ shouldAdvanceTime: false, toFake: ["setTimeout", "clearTimeout"] });
           try {
             capturedListener!("change", "guide.md");
-            expect(jest.getTimerCount()).toBe(1);
+            expect(vi.getTimerCount()).toBe(1);
 
-            await jest.advanceTimersByTime(199);
-            expect(jest.getTimerCount()).toBe(1);
+            await vi.advanceTimersByTimeAsync(199);
+            expect(vi.getTimerCount()).toBe(1);
 
-            await jest.advanceTimersByTime(1);
-            expect(jest.getTimerCount()).toBe(0);
+            await vi.advanceTimersByTimeAsync(1);
+            expect(vi.getTimerCount()).toBe(0);
+            await flushMacrotasks();
           } finally {
+            vi.useRealTimers();
             await server.stop();
           }
         }));
@@ -319,31 +323,34 @@ describe("previewCommand", () => {
           await createFile(root, "docs/guide.md", "# Guide");
 
           let capturedListener: WatchListener | null = null;
-          mockWatch.mockImplementation((_path, _options, listener) => {
-            capturedListener = listener;
-          });
+          mockWatch.mockImplementation(
+            (_path: string, _options: unknown, listener: WatchListener) => {
+              capturedListener = listener;
+            },
+          );
 
           const stdout = makeWritable();
           const { server } = await previewCommand({ cwd: root, stdout, port: "0" });
           const initialOutput = stdout.output;
 
+          // Switch to fake timers only after previewCommand resolves. If fake timers were
+          // installed earlier, they would intercept the real async operations inside
+          // previewCommand (port binding, initial weave) and cause it to hang.
+          vi.useFakeTimers({ shouldAdvanceTime: false, toFake: ["setTimeout", "clearTimeout"] });
           try {
             capturedListener!("change", "a.md");
             capturedListener!("change", "b.md");
             capturedListener!("change", "c.md");
 
-            expect(jest.getTimerCount()).toBe(1);
+            expect(vi.getTimerCount()).toBe(1);
 
-            await jest.advanceTimersByTime(200);
-            // Two flushes are needed here because the live Bun.serve server adds
-            // an extra async hop compared to weaveProject alone — one flush drains
-            // the I/O callbacks from weaveProject, the second drains those from the
-            // server's internal response handling.
-            await flushMacrotasks();
-            await flushMacrotasks();
+            await vi.advanceTimersByTimeAsync(200);
+            vi.useRealTimers();
+            await new Promise((resolve) => setTimeout(resolve, 500));
 
             expect(stdout.output).toBe(initialOutput + "Re-wove: 1 file(s) written.\n");
           } finally {
+            vi.useRealTimers();
             await server.stop();
           }
         }));

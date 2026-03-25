@@ -1,4 +1,4 @@
-import { test, expect, describe, mock, afterEach, beforeEach, jest } from "bun:test";
+import { test, expect, describe, vi, afterEach, beforeEach } from "vitest";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -10,17 +10,17 @@ import {
 } from "../../../tests/helpers.ts";
 
 type WatchListener = (event: string, filename: string | null) => void;
-const mockWatch = mock((_path: string, _options: unknown, _listener: WatchListener) => {});
+const mockWatch = vi.fn((_path: string, _options: unknown, _listener: WatchListener) => {});
 
-mock.module("node:fs", () => ({
-  ...require("node:fs"),
+vi.mock("node:fs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:fs")>()),
   watch: mockWatch,
 }));
 
 const { weaveCommand } = await import("./command.ts");
 
 afterEach(() => {
-  mock.clearAllMocks();
+  vi.clearAllMocks();
 });
 
 describe("weaveCommand", () => {
@@ -166,6 +166,14 @@ describe("weaveCommand", () => {
   });
 
   describe("when the watch option is set", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: false, toFake: ["setTimeout", "clearTimeout"] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     test("writes the weave summary then a watching message to stdout", () =>
       withTempDir(async (root) => {
         await writeConfig(root);
@@ -236,17 +244,9 @@ describe("weaveCommand", () => {
           watch: true,
         });
 
-        const calledPaths = mockWatch.mock.calls.map((c) => c[0]);
+        const calledPaths = mockWatch.mock.calls.map((c: unknown[]) => c[0]);
         expect(calledPaths).not.toContain(join(root, "src/docs"));
       }));
-
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
-    });
 
     test("schedules a reweave with a 200ms debounce when the watcher callback fires", () =>
       withTempDir(async (root) => {
@@ -255,9 +255,11 @@ describe("weaveCommand", () => {
         await createFile(root, "docs/guide.md", "# Guide");
 
         let capturedListener: WatchListener | null = null;
-        mockWatch.mockImplementation((_path, _options, listener) => {
-          capturedListener = listener;
-        });
+        mockWatch.mockImplementation(
+          (_path: string, _options: unknown, listener: WatchListener) => {
+            capturedListener = listener;
+          },
+        );
 
         await weaveCommand({
           cwd: root,
@@ -267,13 +269,14 @@ describe("weaveCommand", () => {
         });
 
         capturedListener!("change", "guide.md");
-        expect(jest.getTimerCount()).toBe(1);
+        expect(vi.getTimerCount()).toBe(1);
 
-        await jest.advanceTimersByTime(199);
-        expect(jest.getTimerCount()).toBe(1);
+        await vi.advanceTimersByTimeAsync(199);
+        expect(vi.getTimerCount()).toBe(1);
 
-        await jest.advanceTimersByTime(1);
-        expect(jest.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(1);
+        await flushMacrotasks();
+        expect(vi.getTimerCount()).toBe(0);
       }));
 
     test("debounces rapid watcher callbacks into a single reweave", () =>
@@ -283,11 +286,14 @@ describe("weaveCommand", () => {
         await createFile(root, "docs/guide.md", "# Guide");
 
         let capturedListener: WatchListener | null = null;
-        mockWatch.mockImplementation((_path, _options, listener) => {
-          capturedListener = listener;
-        });
+        mockWatch.mockImplementation(
+          (_path: string, _options: unknown, listener: WatchListener) => {
+            capturedListener = listener;
+          },
+        );
 
         const stdout = makeWritable();
+
         await weaveCommand({ cwd: root, stdout, stderr: makeWritable(), watch: true });
         const initialOutput = stdout.output;
 
@@ -295,10 +301,11 @@ describe("weaveCommand", () => {
         capturedListener!("change", "b.md");
         capturedListener!("change", "c.md");
 
-        expect(jest.getTimerCount()).toBe(1);
+        expect(vi.getTimerCount()).toBe(1);
 
-        await jest.advanceTimersByTime(200);
-        await flushMacrotasks();
+        await vi.advanceTimersByTimeAsync(200);
+        vi.useRealTimers();
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
         expect(stdout.output).toBe(initialOutput + "Wove 1 doc file(s), wrote 1 output(s).\n");
       }));

@@ -1,4 +1,4 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe } from "vitest";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { DiagnosticSeverity } from "vscode-languageserver/node.js";

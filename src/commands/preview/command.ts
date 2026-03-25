@@ -1,6 +1,8 @@
 import { watch } from "node:fs";
-import { readFile } from "node:fs/promises";
-import { join, extname, dirname, posix } from "node:path";
+import { readFile, stat } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { join, extname, posix } from "node:path";
 import { marked, Renderer } from "marked";
 import { findProjectRoot, loadConfig } from "../../config.ts";
 import { weaveProject } from "../../weaver.ts";
@@ -63,19 +65,83 @@ ${body}
 </html>`;
 }
 
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    const s = await stat(filePath);
+    return s.isFile();
+  } catch {
+    return false;
+  }
+}
+
+async function handleRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  targetDir: string,
+): Promise<void> {
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const pathname = url.pathname;
+  const filePath = join(targetDir, pathname);
+
+  try {
+    if (extname(filePath) === ".md") {
+      const content = await readFile(filePath, "utf-8");
+      const html = await marked(content, { renderer: makeRenderer(pathname) });
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(htmlShell(pathname, html));
+      return;
+    }
+
+    if (await fileExists(filePath)) {
+      const content = await readFile(filePath);
+      res.writeHead(200);
+      res.end(content);
+      return;
+    }
+
+    // No extension — try resolving as a directory index
+    const indexPath = join(filePath, "index.md");
+    if (await fileExists(indexPath)) {
+      const content = await readFile(indexPath, "utf-8");
+      const indexPathname = posix.join(pathname === "/" ? "" : pathname, "index.md");
+      const html = await marked(content, { renderer: makeRenderer(indexPathname) });
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(htmlShell(pathname, html));
+      return;
+    }
+
+    res.writeHead(404);
+    res.end("Not found");
+  } catch {
+    res.writeHead(404);
+    res.end("Not found");
+  }
+}
+
 async function startOnAvailablePort(
   startPort: number,
-  fetch: (req: Request) => Promise<Response>,
-): Promise<ReturnType<typeof Bun.serve>> {
+  targetDir: string,
+): Promise<{ server: ReturnType<typeof createServer>; port: number }> {
   let port = startPort;
   while (true) {
+    const server = createServer((req, res) => {
+      void handleRequest(req, res, targetDir);
+    });
     try {
-      return Bun.serve({ port, fetch });
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(port, "localhost", resolve);
+      });
+      const address = server.address();
+      const actualPort = typeof address === "object" && address ? address.port : port;
+      return { server, port: actualPort };
     } catch (err) {
-      if (err instanceof Error && (err as NodeJS.ErrnoException).code === "EADDRINUSE") {
+      if ((err as NodeJS.ErrnoException).code === "EADDRINUSE") {
+        server.close();
         port += 1;
         continue;
       }
+      server.close();
       throw err;
     }
   }
@@ -95,44 +161,9 @@ export async function previewCommand({
   const targetDir = join(projectRoot, config.target);
   const startPort = portOption ? parseInt(portOption, 10) : 4567;
 
-  const server = await startOnAvailablePort(startPort, async function fetch(req) {
-    const url = new URL(req.url);
-    const pathname = url.pathname;
-    const filePath = join(targetDir, pathname);
+  const { server, port } = await startOnAvailablePort(startPort, targetDir);
 
-    try {
-      if (extname(filePath) === ".md") {
-        const content = await readFile(filePath, "utf-8");
-        const html = await marked(content, { renderer: makeRenderer(pathname) });
-        return new Response(htmlShell(pathname, html), {
-          headers: { "Content-Type": "text/html" },
-        });
-      }
-
-      const file = Bun.file(filePath);
-      if (await file.exists()) {
-        return new Response(file);
-      }
-
-      // No extension — try resolving as a directory index
-      const indexPath = join(filePath, "index.md");
-      const indexFile = Bun.file(indexPath);
-      if (await indexFile.exists()) {
-        const content = await readFile(indexPath, "utf-8");
-        const indexPathname = posix.join(pathname === "/" ? "" : pathname, "index.md");
-        const html = await marked(content, { renderer: makeRenderer(indexPathname) });
-        return new Response(htmlShell(pathname, html), {
-          headers: { "Content-Type": "text/html" },
-        });
-      }
-
-      return new Response("Not found", { status: 404 });
-    } catch {
-      return new Response("Not found", { status: 404 });
-    }
-  });
-
-  stdout.write(`Preview server running at http://localhost:${server.port}\n`);
+  stdout.write(`Preview server running at http://localhost:${port}\n`);
 
   const sourceDir = join(projectRoot, config.source.code);
   const docsDir = join(projectRoot, config.source.docs);
@@ -167,5 +198,14 @@ export async function previewCommand({
     });
   }
 
-  return { server };
+  return {
+    server: {
+      port,
+      stop(): Promise<void> {
+        return new Promise((resolve, reject) => {
+          server.close((err) => (err ? reject(err) : resolve()));
+        });
+      },
+    },
+  };
 }

@@ -6,23 +6,29 @@
     "spool": "dist/cli.js"
   },
   "type": "module",
-  "module": "src/cli.ts",
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "lint": "tsc --noEmit",
-    "run-tool": "bun run src/cli.ts"
+    "test": "vitest run",
+    "run-tool": "tsx src/cli.ts"
   },
   "dependencies": {
     "commander": "^13.1.0",
+    "fast-glob": "^3.3.3",
     "marked": "^15.0.7",
+    "micromatch": "^4.0.8",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "oxfmt": "^0.40.0"
+    "@types/micromatch": "^4.0.9",
+    "@types/node": "^25.5.0",
+    "execa": "^9.6.1",
+    "oxfmt": "^0.40.0",
+    "tsx": "^4.19.3",
+    "vitest": "^3.1.1"
   },
   "peerDependencies": {
     "typescript": "^5"

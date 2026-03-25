@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, posix } from "node:path";
-import { Glob } from "bun";
+import fg from "fast-glob";
 import type { ParseError } from "./parser.ts";
 import { parsePassageReferences, VALID_MODIFIERS } from "./parser.ts";
 import type { PassageRegistry, PassageTemplateRegistry, FileErrors } from "./registries.ts";
@@ -65,8 +65,8 @@ export async function weaveProject(projectRoot: string, config: SpoolConfig): Pr
   let filesProcessed = 0;
   let filesWritten = 0;
 
-  const glob = new Glob("**/*.md");
-  for await (const entry of glob.scan({ cwd: docsDir })) {
+  const entries = await fg("**/*.md", { cwd: docsDir });
+  for (const entry of entries) {
     filesProcessed++;
     const fullPath = join(docsDir, entry);
     const content = await readFile(fullPath, "utf-8");

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { Glob } from "bun";
+import fg from "fast-glob";
+import micromatch from "micromatch";
 import type { ParseError, NestedRef } from "./parser.ts";
 import { parseSourcePassages } from "./parser.ts";
 import type { SpoolConfig } from "./config.ts";
@@ -39,10 +40,10 @@ export async function buildRegistries(
   const sourceDir = join(projectRoot, config.source.code);
   const docsDir = join(projectRoot, config.source.docs);
 
-  const excludeGlobs = (config.source.excludeFromCode ?? []).map((p) => new Glob(p));
+  const excludePatterns = config.source.excludeFromCode ?? [];
 
-  const glob = new Glob("**/*");
-  for await (const entry of glob.scan({ cwd: sourceDir, dot: false })) {
+  const entries = await fg("**/*", { cwd: sourceDir, dot: false, onlyFiles: true });
+  for (const entry of entries) {
     const fullPath = join(sourceDir, entry);
     const relPath = relative(projectRoot, fullPath);
 
@@ -52,7 +53,7 @@ export async function buildRegistries(
     }
 
     // Skip excluded patterns
-    if (excludeGlobs.some((g) => g.match(relPath))) {
+    if (excludePatterns.length > 0 && micromatch.isMatch(relPath, excludePatterns)) {
       continue;
     }
 

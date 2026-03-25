@@ -1,10 +1,16 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe } from "vitest";
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { realpathSync } from "node:fs";
+import { createInterface } from "node:readline";
+import { fileURLToPath } from "node:url";
+import { execa } from "execa";
 import { withTempDir, createFile, writeConfig } from "../tests/helpers.ts";
 
-const CLI = join(import.meta.dir, "cli.ts");
+const CLI = fileURLToPath(new URL("cli.ts", import.meta.url));
+// Resolve tsx from this project's node_modules so it's found regardless of CWD.
+// --import requires a file: URL (not a bare path) when the specifier is absolute.
+const TSX_ESM = new URL("../node_modules/tsx/dist/esm/index.mjs", import.meta.url).href;
 
 type SpawnResult = {
   stdout: string;
@@ -17,56 +23,39 @@ async function runCLI(
   cwd: string,
   opts: { timeout?: number } = {},
 ): Promise<SpawnResult> {
-  const proc = Bun.spawn(["bun", "run", CLI, ...args], {
+  const result = await execa("node", ["--import", TSX_ESM, CLI, ...args], {
     cwd,
-    stdout: "pipe",
-    stderr: "pipe",
+    stdin: "ignore",
+    reject: false,
+    stripFinalNewline: false,
+    timeout: opts.timeout ?? 10_000,
   });
-
-  const timeout = opts.timeout ?? 10_000;
-  const timer = setTimeout(() => proc.kill(), timeout);
-
-  try {
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
-    return { stdout, stderr, exitCode };
-  } finally {
-    clearTimeout(timer);
-  }
+  return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode };
 }
 
 async function spawnCLI(
   args: string[],
   cwd: string,
-): Promise<{ proc: ReturnType<typeof Bun.spawn>; readLine(): Promise<string> }> {
-  const proc = Bun.spawn(["bun", "run", CLI, ...args], {
+): Promise<{
+  proc: ReturnType<typeof execa>;
+  readLine(): Promise<string>;
+  kill(): void;
+}> {
+  const proc = execa("node", ["--import", TSX_ESM, CLI, ...args], {
     cwd,
-    stdout: "pipe",
-    stderr: "pipe",
+    stdin: "ignore",
   });
+  proc.catch(() => {}); // suppress unhandled rejection on kill
 
-  const reader = proc.stdout.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
+  const rl = createInterface({ input: proc.stdout! });
+  const lineIter = rl[Symbol.asyncIterator]();
 
   async function readLine(): Promise<string> {
-    while (true) {
-      const newline = buffer.indexOf("\n");
-      if (newline !== -1) {
-        const line = buffer.slice(0, newline);
-        buffer = buffer.slice(newline + 1);
-        return line;
-      }
-      const { done, value } = await reader.read();
-      if (done) return buffer;
-      buffer += decoder.decode(value);
-    }
+    const { value } = await lineIter.next();
+    return value as string;
   }
 
-  return { proc, readLine };
+  return { proc, readLine, kill: () => proc.kill() };
 }
 
 describe("spool weave", () => {
@@ -140,15 +129,15 @@ describe("spool weave", () => {
         await mkdir(join(root, "src"), { recursive: true });
         await createFile(root, "docs/guide.md", "# Guide");
 
-        const { proc, readLine } = await spawnCLI(["weave", "--watch"], root);
+        const { proc, readLine, kill } = await spawnCLI(["weave", "--watch"], root);
         try {
           const line1 = await readLine();
           const line2 = await readLine();
           expect(line1).toBe("Wove 1 doc file(s), wrote 1 output(s).");
           expect(line2).toBe("Watching for changes…");
         } finally {
-          proc.kill();
-          await proc.exited;
+          kill();
+          await new Promise((resolve) => proc.on("close", resolve));
         }
       }));
   });
@@ -199,50 +188,59 @@ describe("spool lsp", () => {
   type JsonRpcMessage = Record<string, unknown>;
 
   async function startLspClient(root: string): Promise<{
-    proc: ReturnType<typeof Bun.spawn>;
+    proc: ReturnType<typeof execa>;
     send(msg: unknown): void;
     readMessage(): Promise<JsonRpcMessage>;
     readNotification(method: string): Promise<JsonRpcMessage>;
+    kill(): void;
   }> {
-    const proc = Bun.spawn(["bun", "run", CLI, "lsp"], {
-      cwd: root,
-      stdin: "pipe",
-      stdout: "pipe",
-      stderr: "pipe",
-    });
+    const proc = execa("node", ["--import", TSX_ESM, CLI, "lsp"], { cwd: root });
+    proc.catch(() => {}); // suppress unhandled rejection on kill
 
-    const reader = proc.stdout.getReader();
     const decoder = new TextDecoder("utf-8");
     let raw = "";
+    let pendingResolver: ((msg: JsonRpcMessage) => void) | null = null;
+    const messageQueue: JsonRpcMessage[] = [];
+
+    function tryParseMessage(): JsonRpcMessage | null {
+      const headerEnd = raw.indexOf("\r\n\r\n");
+      if (headerEnd === -1) return null;
+      const header = raw.slice(0, headerEnd);
+      const lengthMatch = header.match(/Content-Length:\s*(\d+)/i);
+      if (!lengthMatch) throw new Error(`No Content-Length in header: ${header}`);
+      const contentLength = parseInt(lengthMatch[1]!, 10);
+      const bodyStart = headerEnd + 4;
+      const bodyBytes = Buffer.from(raw.slice(bodyStart), "utf-8");
+      if (bodyBytes.length < contentLength) return null;
+      raw = bodyBytes.slice(contentLength).toString("utf-8");
+      return JSON.parse(bodyBytes.slice(0, contentLength).toString("utf-8")) as JsonRpcMessage;
+    }
+
+    proc.stdout.on("data", (chunk: Buffer) => {
+      raw += decoder.decode(chunk);
+      const msg = tryParseMessage();
+      if (msg !== null) {
+        if (pendingResolver) {
+          const res = pendingResolver;
+          pendingResolver = null;
+          res(msg);
+        } else {
+          messageQueue.push(msg);
+        }
+      }
+    });
 
     async function readMessage(): Promise<JsonRpcMessage> {
-      while (true) {
-        const headerEnd = raw.indexOf("\r\n\r\n");
-        if (headerEnd !== -1) {
-          const header = raw.slice(0, headerEnd);
-          const lengthMatch = header.match(/Content-Length:\s*(\d+)/i);
-          if (!lengthMatch) throw new Error(`No Content-Length in header: ${header}`);
-          const contentLength = parseInt(lengthMatch[1]!, 10);
-
-          // Collect body bytes
-          let bodyBuf = Buffer.from(raw.slice(headerEnd + 4), "utf-8");
-          while (bodyBuf.length < contentLength) {
-            const { done, value } = await reader.read();
-            if (done) throw new Error("Stream ended before body was complete");
-            bodyBuf = Buffer.concat([bodyBuf, Buffer.from(value)]);
-          }
-          raw = bodyBuf.slice(contentLength).toString("utf-8");
-          return JSON.parse(bodyBuf.slice(0, contentLength).toString("utf-8")) as JsonRpcMessage;
-        }
-
-        const { done, value } = await reader.read();
-        if (done) throw new Error("Stream ended before header was complete");
-        raw += decoder.decode(value, { stream: true });
+      if (messageQueue.length > 0) {
+        return messageQueue.shift()!;
       }
+      return new Promise((resolve) => {
+        pendingResolver = resolve;
+      });
     }
 
     function send(msg: unknown): void {
-      proc.stdin.write(encodeMessage(msg));
+      proc.stdin!.write(encodeMessage(msg));
     }
 
     async function initialize(): Promise<void> {
@@ -256,15 +254,12 @@ describe("spool lsp", () => {
           capabilities: {},
         },
       });
-      // Wait for the initialize response
       const response = await readMessage();
       if (response["id"] !== 1) throw new Error(`Unexpected response: ${JSON.stringify(response)}`);
-      // Send initialized notification
       send({ jsonrpc: "2.0", method: "initialized", params: {} });
     }
 
     await initialize();
-    // Allow time for onInitialized to rebuild registries
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     async function readNotification(method: string): Promise<JsonRpcMessage> {
@@ -274,7 +269,11 @@ describe("spool lsp", () => {
       }
     }
 
-    return { proc, send, readMessage, readNotification };
+    function kill(): void {
+      proc.kill();
+    }
+
+    return { proc, send, readMessage, readNotification, kill };
   }
 
   describe("when a doc file is changed with an unknown reference", () => {
@@ -312,8 +311,8 @@ describe("spool lsp", () => {
           expect(params.diagnostics).toHaveLength(1);
           expect(params.diagnostics[0]!.message).toContain("Unknown file");
         } finally {
-          client.proc.kill();
-          await client.proc.exited;
+          client.kill();
+          await new Promise((resolve) => client.proc.on("close", resolve));
         }
       }));
   });
@@ -352,8 +351,8 @@ describe("spool lsp", () => {
           expect(params.uri).toBe(docUri);
           expect(params.diagnostics).toHaveLength(0);
         } finally {
-          client.proc.kill();
-          await client.proc.exited;
+          client.kill();
+          await new Promise((resolve) => client.proc.on("close", resolve));
         }
       }));
   });
@@ -375,7 +374,6 @@ describe("spool lsp", () => {
           const docUri = `file://${realRoot}/docs/guide.md`;
           const srcUri = `file://${realRoot}/src/car.ts`;
 
-          // Open the doc file — registry is already populated at startup
           client.send({
             jsonrpc: "2.0",
             method: "textDocument/didOpen",
@@ -389,12 +387,10 @@ describe("spool lsp", () => {
             },
           });
 
-          // Consume the initial diagnostics notification for the doc file
           const initial = await client.readNotification("textDocument/publishDiagnostics");
           const initialParams = initial["params"] as { diagnostics: unknown[] };
           expect(initialParams.diagnostics).toHaveLength(0);
 
-          // Also open the source file so the server tracks it in TextDocuments
           client.send({
             jsonrpc: "2.0",
             method: "textDocument/didOpen",
@@ -409,10 +405,8 @@ describe("spool lsp", () => {
               },
             },
           });
-          // Consume the diagnostics sent for the source file open
           await client.readNotification("textDocument/publishDiagnostics");
 
-          // Save the source file — should trigger a registry rebuild then re-validate open docs
           client.send({
             jsonrpc: "2.0",
             method: "textDocument/didSave",
@@ -421,7 +415,6 @@ describe("spool lsp", () => {
             },
           });
 
-          // After the 300ms debounce the server re-validates all open docs
           const revalidated = await client.readNotification("textDocument/publishDiagnostics");
           const revalidatedParams = revalidated["params"] as {
             uri: string;
@@ -430,8 +423,8 @@ describe("spool lsp", () => {
           expect(revalidatedParams.uri).toBe(docUri);
           expect(revalidatedParams.diagnostics).toHaveLength(0);
         } finally {
-          client.proc.kill();
-          await client.proc.exited;
+          client.kill();
+          await new Promise((resolve) => client.proc.on("close", resolve));
         }
       }));
   });
@@ -445,15 +438,15 @@ describe("spool preview", () => {
         await mkdir(join(root, "src"), { recursive: true });
         await createFile(root, "docs/guide.md", "# Guide");
 
-        const { proc, readLine } = await spawnCLI(["preview", "--port", "0"], root);
+        const { proc, readLine, kill } = await spawnCLI(["preview", "--port", "0"], root);
         try {
           const line1 = await readLine();
           const line2 = await readLine();
           expect(line1).toBe("Initial weave: 1 file(s) written.");
           expect(line2).toMatch(/^Preview server running at http:\/\/localhost:\d+$/);
         } finally {
-          proc.kill();
-          await proc.exited;
+          kill();
+          await new Promise((resolve) => proc.on("close", resolve));
         }
       }));
 
@@ -463,7 +456,7 @@ describe("spool preview", () => {
         await mkdir(join(root, "src"), { recursive: true });
         await createFile(root, "docs/guide.md", "# Hello");
 
-        const { proc, readLine } = await spawnCLI(["preview", "--port", "0"], root);
+        const { proc, readLine, kill } = await spawnCLI(["preview", "--port", "0"], root);
         try {
           await readLine(); // weave summary
           const urlLine = await readLine();
@@ -472,8 +465,8 @@ describe("spool preview", () => {
           expect(res.status).toBe(200);
           expect(res.headers.get("content-type")).toContain("text/html");
         } finally {
-          proc.kill();
-          await proc.exited;
+          kill();
+          await new Promise((resolve) => proc.on("close", resolve));
         }
       }));
   });
@@ -485,14 +478,14 @@ describe("spool preview", () => {
         await mkdir(join(root, "src"), { recursive: true });
         await createFile(root, "docs/guide.md", "# Guide");
 
-        const { proc, readLine } = await spawnCLI(["preview", "--port", "0"], root);
+        const { proc, readLine, kill } = await spawnCLI(["preview", "--port", "0"], root);
         try {
           await readLine();
           const urlLine = await readLine();
           expect(urlLine).toMatch(/^Preview server running at http:\/\/localhost:\d+$/);
         } finally {
-          proc.kill();
-          await proc.exited;
+          kill();
+          await new Promise((resolve) => proc.on("close", resolve));
         }
       }));
   });

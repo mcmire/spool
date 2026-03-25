@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join, relative, posix } from "node:path";
-import { Glob } from "bun";
+import fg from "fast-glob";
 import type { SpoolConfig } from "../../config.ts";
 import { parsePassageReferences } from "../../parser.ts";
 import { buildRegistries } from "../../registries.ts";
@@ -17,8 +17,8 @@ export async function lintProject(projectRoot: string, config: SpoolConfig): Pro
   const docErrors: FileErrors[] = [];
   const docsDir = join(projectRoot, config.source.docs);
 
-  const glob = new Glob("**/*.md");
-  for await (const entry of glob.scan({ cwd: docsDir })) {
+  const entries = await fg("**/*.md", { cwd: docsDir });
+  for (const entry of entries) {
     const fullPath = join(docsDir, entry);
     const content = await readFile(fullPath, "utf-8");
     const { refs } = parsePassageReferences(content);

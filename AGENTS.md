@@ -10,23 +10,32 @@ The annotation syntax is language-agnostic — any comment style (`//`, `#`, `--
 
 ```sh
 # Run the CLI
-bun run src/cli.ts
+npm run run-tool -- <args>
 
 # Run all tests
-bun test
+npm test
 
 # Type-check without emitting
-bun run lint
+npm run lint
 
 # Format
-bun run fmt
+npm run fmt
 
 # Check formatting
-bun run fmt:check
+npm run fmt:check
 
 # Build compiled output to dist/
-bun run build
+npm run build
 ```
+
+## Tooling
+
+This project uses **Node.js** (not Bun).
+
+- Run TypeScript files with `tsx <file>` or via `npm run run-tool`
+- Use `npm install` / `npm install --save-dev` for packages
+- Use `node:fs`, `node:path`, `node:readline`, etc. (always with the `node:` prefix)
+- Use `execa` for spawning subprocesses in tests
 
 ## File structure
 
@@ -53,11 +62,11 @@ dist/                     # Compiled output (tsc); mirrors src/ structure
 
 ## Formatting
 
-After updating a batch of files, run `bun fmt` to format them all before moving on.
+After updating a batch of files, run `npm run fmt` to format them all before moving on.
 
 ## Writing tests
 
-Tests use `bun:test`. Run them with `bun test`.
+Tests use `vitest`. Run them with `npm test`.
 
 ### Structure: conditions and outcomes
 

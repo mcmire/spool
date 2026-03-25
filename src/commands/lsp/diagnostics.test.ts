@@ -1,4 +1,4 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe } from "vitest";
 import { DiagnosticSeverity } from "vscode-languageserver/node.js";
 import { getSourceFileDiagnostics, getDocFileDiagnostics } from "./diagnostics.ts";
 import type { PassageRegistry, PassageTemplateRegistry } from "../../registries.ts";

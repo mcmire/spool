@@ -6,7 +6,7 @@ import {
 } from "vscode-languageserver/node.js";
 import type { InitializeResult, Diagnostic } from "vscode-languageserver/node.js";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { Glob } from "bun";
+import micromatch from "micromatch";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findProjectRoot, loadConfig } from "../../config.ts";
@@ -40,8 +40,8 @@ export function createServerHandlers(
       return false;
     }
     const relPath = relative(projectRoot, filePath);
-    const excludeGlobs = (config.source.excludeFromCode ?? []).map((p) => new Glob(p));
-    return !excludeGlobs.some((g) => g.match(relPath));
+    const excludePatterns = config.source.excludeFromCode ?? [];
+    return !(excludePatterns.length > 0 && micromatch.isMatch(relPath, excludePatterns));
   }
 
   function isDocFile(filePath: string): boolean {

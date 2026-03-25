@@ -1,4 +1,4 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe } from "vitest";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { lintCommand } from "./command.ts";
