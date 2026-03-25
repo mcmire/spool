@@ -41,20 +41,52 @@ program
     }
   });
 
-program
-  .command("preview")
-  .description("Start a preview server with live reloading")
-  .option("-p, --port <port>", "Port to listen on", "4567")
+const site = program
+  .command("site")
+  .description("Build and serve a documentation site from woven output");
+
+site
+  .command("dev")
+  .description("Start a development server with live reloading")
+  .option("-p, --port <port>", "Port to listen on", "5173")
   .action(async (options: { port?: string }) => {
-    const { previewCommand } = await import("./commands/preview/command.ts");
-    const { server } = await previewCommand({
+    const { siteDevCommand } = await import("./commands/site/command.ts");
+    const { server } = await siteDevCommand({
       cwd: process.cwd(),
       stdout: process.stdout,
+      stderr: process.stderr,
       ...options,
     });
     process.on("SIGINT", () => {
-      server.stop();
+      server
+        .stop()
+        .catch(() => {})
+        .finally(() => {
+          // Kill the process group to take down child processes spawned by
+          // Vite/VitePress (e.g. the esbuild binary), then exit.
+          try {
+            process.kill(0, "SIGTERM");
+          } catch {}
+          process.exit(0);
+        });
+      // Failsafe: force exit if stop() hangs.
+      setTimeout(() => process.exit(0), 3000).unref();
     });
+  });
+
+site
+  .command("build")
+  .description("Build the documentation site for production")
+  .action(async () => {
+    const { siteBuildCommand } = await import("./commands/site/command.ts");
+    const result = await siteBuildCommand({
+      cwd: process.cwd(),
+      stdout: process.stdout,
+      stderr: process.stderr,
+    });
+    if (result.exitCode !== undefined) {
+      process.exitCode = result.exitCode;
+    }
   });
 
 program

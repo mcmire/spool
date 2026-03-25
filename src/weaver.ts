@@ -176,3 +176,50 @@ export async function weaveProject(projectRoot: string, config: SpoolConfig): Pr
 
   return { filesProcessed, filesWritten, registryErrors, weaveErrors };
 }
+
+export type WeaveInMemoryResult = {
+  filesProcessed: number;
+  files: Map<string, string>;
+  registryErrors: FileErrors[];
+  weaveErrors: FileErrors[];
+};
+
+export async function weaveProjectInMemory(
+  projectRoot: string,
+  config: SpoolConfig,
+): Promise<WeaveInMemoryResult> {
+  const {
+    registry,
+    templateRegistry,
+    passagePositions,
+    errors: registryErrors,
+  } = await buildRegistries(projectRoot, config);
+
+  const docsDir = join(projectRoot, config.source.docs);
+  const weaveErrors: FileErrors[] = [];
+  const files: Map<string, string> = new Map();
+  let filesProcessed = 0;
+
+  const entries = await fg("**/*.md", { cwd: docsDir });
+  for (const entry of entries) {
+    filesProcessed++;
+    const fullPath = join(docsDir, entry);
+    const content = await readFile(fullPath, "utf-8");
+    const { output, errors } = weaveFile(
+      content,
+      registry,
+      templateRegistry,
+      passagePositions,
+      config.source.code,
+    );
+
+    if (errors.length > 0) {
+      const relPath = relative(projectRoot, fullPath);
+      weaveErrors.push({ filePath: relPath, errors });
+    }
+
+    files.set(entry, output);
+  }
+
+  return { filesProcessed, files, registryErrors, weaveErrors };
+}

@@ -30,7 +30,7 @@ async function runCLI(
     stripFinalNewline: false,
     timeout: opts.timeout ?? 10_000,
   });
-  return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode };
+  return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode ?? null };
 }
 
 async function spawnCLI(
@@ -430,63 +430,68 @@ describe("spool lsp", () => {
   });
 });
 
-describe("spool preview", () => {
+describe("spool site dev", () => {
   describe("when the server starts", () => {
-    test("prints the initial weave summary and server URL", () =>
-      withTempDir(async (root) => {
-        await writeConfig(root);
-        await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/guide.md", "# Guide");
+    test(
+      "prints the initial weave summary and server URL",
+      () =>
+        withTempDir(async (root) => {
+          await writeConfig(root);
+          await mkdir(join(root, "src"), { recursive: true });
+          await createFile(root, "docs/guide.md", "# Guide");
 
-        const { proc, readLine, kill } = await spawnCLI(["preview", "--port", "0"], root);
-        try {
-          const line1 = await readLine();
-          const line2 = await readLine();
-          expect(line1).toBe("Initial weave: 1 file(s) written.");
-          expect(line2).toMatch(/^Preview server running at http:\/\/localhost:\d+$/);
-        } finally {
-          kill();
-          await new Promise((resolve) => proc.on("close", resolve));
-        }
-      }));
+          const { proc, readLine, kill } = await spawnCLI(["site", "dev"], root);
+          try {
+            const line1 = await readLine();
+            expect(line1).toBe("Initial weave: 1 file(s) written.");
+            // VitePress may emit port-conflict messages before the server URL, so
+            // keep reading until we see the URL line.
+            let serverLine = "";
+            while (!serverLine.startsWith("Dev server running at")) {
+              serverLine = await readLine();
+            }
+            expect(serverLine).toMatch(/^Dev server running at http:\/\/localhost:\d+$/);
+          } finally {
+            kill();
+            await new Promise((resolve) => proc.on("close", resolve));
+          }
+        }),
+      30_000,
+    );
+  });
+});
 
-    test("responds to HTTP requests", () =>
-      withTempDir(async (root) => {
-        await writeConfig(root);
-        await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/guide.md", "# Hello");
+describe("spool site build", () => {
+  describe("when the project has no errors", () => {
+    test(
+      "exits 0 and prints a success message",
+      () =>
+        withTempDir(async (root) => {
+          await writeConfig(root);
+          await mkdir(join(root, "src"), { recursive: true });
+          await createFile(root, "docs/guide.md", "# Guide");
 
-        const { proc, readLine, kill } = await spawnCLI(["preview", "--port", "0"], root);
-        try {
-          await readLine(); // weave summary
-          const urlLine = await readLine();
-          const url = urlLine.replace("Preview server running at ", "");
-          const res = await fetch(`${url}/guide.md`);
-          expect(res.status).toBe(200);
-          expect(res.headers.get("content-type")).toContain("text/html");
-        } finally {
-          kill();
-          await new Promise((resolve) => proc.on("close", resolve));
-        }
-      }));
+          const { stdout, exitCode } = await runCLI(["site", "build"], root, { timeout: 30_000 });
+
+          expect(exitCode).toBe(0);
+          expect(stdout).toContain("Initial weave: 1 file(s) written.");
+          expect(stdout).toContain("Site built successfully.");
+        }),
+      30_000,
+    );
   });
 
-  describe("when a custom --port is specified", () => {
-    test("starts the server on that port", () =>
+  describe("when the project has weave errors", () => {
+    test("exits 1 without building", () =>
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/guide.md", "# Guide");
+        await createFile(root, "docs/guide.md", "::SPOOL:: <<missing.ts#passage>>");
 
-        const { proc, readLine, kill } = await spawnCLI(["preview", "--port", "0"], root);
-        try {
-          await readLine();
-          const urlLine = await readLine();
-          expect(urlLine).toMatch(/^Preview server running at http:\/\/localhost:\d+$/);
-        } finally {
-          kill();
-          await new Promise((resolve) => proc.on("close", resolve));
-        }
+        const { stderr, exitCode } = await runCLI(["site", "build"], root);
+
+        expect(exitCode).toBe(1);
+        expect(stderr).toContain("Unknown reference");
       }));
   });
 });

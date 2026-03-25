@@ -9,6 +9,7 @@ export type SpoolConfig = {
     excludeFromCode?: string[];
   };
   target: string;
+  site?: Record<string, unknown>;
 };
 
 const CONFIG_FILE = "spool.json";
@@ -62,5 +63,8 @@ export async function loadConfig(projectRoot: string): Promise<SpoolConfig> {
   return {
     source: { code: sourceCodeDir, docs, excludeFromCode },
     target,
+    ...(parsed.site !== undefined && {
+      site: parsed.site as Record<string, unknown>,
+    }),
   };
 }

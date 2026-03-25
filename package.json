@@ -17,8 +17,8 @@
   "dependencies": {
     "commander": "^13.1.0",
     "fast-glob": "^3.3.3",
-    "marked": "^15.0.7",
     "micromatch": "^4.0.8",
+    "vitepress": "^1.6.4",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12"
   },
