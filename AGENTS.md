@@ -64,6 +64,22 @@ dist/                     # Compiled output (tsc); mirrors src/ structure
 
 After updating a batch of files, run `npm run fmt` to format them all before moving on.
 
+## Code style
+
+### No one-line statements
+
+Avoid one-line conditionals and control flow. Use multi-line statements instead:
+
+```ts
+// Bad
+if (foo) bar;
+
+// Good
+if (foo) {
+  bar;
+}
+```
+
 ## Writing tests
 
 Tests use `vitest`. Run them with `npm test`.
