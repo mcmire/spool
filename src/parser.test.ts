@@ -414,6 +414,7 @@ describe("parsePassageReferences", () => {
           line: 1,
           column: 4,
           raw: "::SPOOL:: <<src/car.ts#car>>",
+          isRange: false,
         },
       ]);
       expect(errors).toEqual([]);
@@ -431,6 +432,7 @@ describe("parsePassageReferences", () => {
           line: 1,
           column: 4,
           raw: "::SPOOL:: <<src/car.ts#car:no-expand-nested>>",
+          isRange: false,
         },
       ]);
       expect(errors).toEqual([]);
@@ -446,6 +448,7 @@ describe("parsePassageReferences", () => {
           line: 1,
           column: 4,
           raw: "::SPOOL:: <<src/cli.ts>>",
+          isRange: false,
         },
       ]);
       expect(errors).toEqual([]);
@@ -463,6 +466,7 @@ describe("parsePassageReferences", () => {
           line: 1,
           column: 4,
           raw: "::SPOOL:: <<src/cli.ts:no-expand-nested>>",
+          isRange: false,
         },
       ]);
       expect(errors).toEqual([]);
@@ -477,6 +481,100 @@ describe("parsePassageReferences", () => {
     });
   });
 
+  describe("range references", () => {
+    test("START..END", () => {
+      const { refs, errors } = parsePassageReferences(
+        ["// ::SPOOL:: <<src/car.ts@START..END>>"].join("\n"),
+      );
+      expect(errors).toEqual([]);
+      expect(refs).toEqual([
+        {
+          filePath: "src/car.ts",
+          passageName: undefined,
+          modifier: undefined,
+          line: 1,
+          column: 4,
+          raw: "::SPOOL:: <<src/car.ts@START..END>>",
+          isRange: true,
+          rangeStart: { type: "START" },
+          rangeEnd: { type: "END" },
+        },
+      ]);
+    });
+
+    test("start(#name)..end(#name)", () => {
+      const { refs, errors } = parsePassageReferences(
+        ["// ::SPOOL:: <<src/car.ts@start(#engine)..end(#engine)>>"].join("\n"),
+      );
+      expect(errors).toEqual([]);
+      expect(refs).toEqual([
+        {
+          filePath: "src/car.ts",
+          passageName: undefined,
+          modifier: undefined,
+          line: 1,
+          column: 4,
+          raw: "::SPOOL:: <<src/car.ts@start(#engine)..end(#engine)>>",
+          isRange: true,
+          rangeStart: { type: "start", passageName: "engine" },
+          rangeEnd: { type: "end", passageName: "engine" },
+        },
+      ]);
+    });
+
+    test("mixed markers (END..start(#name))", () => {
+      const { refs, errors } = parsePassageReferences(
+        ["// ::SPOOL:: <<src/car.ts@END..start(#engine)>>"].join("\n"),
+      );
+      expect(errors).toEqual([]);
+      expect(refs).toEqual([
+        {
+          filePath: "src/car.ts",
+          passageName: undefined,
+          modifier: undefined,
+          line: 1,
+          column: 4,
+          raw: "::SPOOL:: <<src/car.ts@END..start(#engine)>>",
+          isRange: true,
+          rangeStart: { type: "END" },
+          rangeEnd: { type: "start", passageName: "engine" },
+        },
+      ]);
+    });
+
+    test("invalid marker produces error", () => {
+      const { refs, errors } = parsePassageReferences(
+        ["// ::SPOOL:: <<src/car.ts@MIDDLE..END>>"].join("\n"),
+      );
+      expect(refs).toEqual([]);
+      expect(errors).toEqual([
+        {
+          line: 1,
+          column: 4,
+          length: 36,
+          message:
+            "Expected reference to match '::SPOOL:: <<file>>', '::SPOOL:: <<file#passage>>', or '::SPOOL:: <<file@start..end>>'",
+        },
+      ]);
+    });
+
+    test("malformed range with missing end marker produces error", () => {
+      const { refs, errors } = parsePassageReferences(
+        ["// ::SPOOL:: <<src/car.ts@START..>>"].join("\n"),
+      );
+      expect(refs).toEqual([]);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    test("malformed range with missing start marker produces error", () => {
+      const { refs, errors } = parsePassageReferences(
+        ["// ::SPOOL:: <<src/car.ts@..END>>"].join("\n"),
+      );
+      expect(refs).toEqual([]);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+  });
+
   describe("invalid references", () => {
     test("::SPOOL:: with no angle brackets produces error", () => {
       const { errors } = parsePassageReferences(["// ::SPOOL::"].join("\n"));
@@ -486,7 +584,7 @@ describe("parsePassageReferences", () => {
           column: 4,
           length: 9,
           message:
-            "Expected reference to match '::SPOOL:: <<file-path>>' or '::SPOOL:: <<file-path#passage-id>>'",
+            "Expected reference to match '::SPOOL:: <<file>>', '::SPOOL:: <<file#passage>>', or '::SPOOL:: <<file@start..end>>'",
         },
       ]);
     });

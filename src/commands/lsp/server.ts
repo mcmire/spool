@@ -12,7 +12,11 @@ import { fileURLToPath } from "node:url";
 import { findProjectRoot, loadConfig } from "../../config.ts";
 import type { SpoolConfig } from "../../config.ts";
 import { buildRegistries } from "../../registries.ts";
-import type { PassageRegistry, PassageTemplateRegistry } from "../../registries.ts";
+import type {
+  PassageRegistry,
+  PassageTemplateRegistry,
+  PassagePositions,
+} from "../../registries.ts";
 import { getSourceFileDiagnostics, getDocFileDiagnostics } from "./diagnostics.ts";
 import packageJson from "../../../package.json" with { type: "json" };
 const { version } = packageJson;
@@ -31,6 +35,7 @@ export function createServerHandlers(
   config: SpoolConfig,
   registry: PassageRegistry,
   templateRegistry: PassageTemplateRegistry,
+  passagePositions: PassagePositions,
   sendDiagnostics: SendDiagnostics,
 ): ServerHandlers {
   function isSourceFile(filePath: string): boolean {
@@ -53,7 +58,13 @@ export function createServerHandlers(
     if (isSourceFile(filePath)) {
       return getSourceFileDiagnostics(content);
     } else if (isDocFile(filePath)) {
-      return getDocFileDiagnostics(content, registry, templateRegistry, config.source.code);
+      return getDocFileDiagnostics(
+        content,
+        registry,
+        templateRegistry,
+        passagePositions,
+        config.source.code,
+      );
     } else {
       return [];
     }
@@ -80,14 +91,22 @@ export function startServer(): void {
   let config: SpoolConfig | null = null;
   let registry: PassageRegistry = new Map();
   let templateRegistry: PassageTemplateRegistry = new Map();
+  let passagePositions: PassagePositions = new Map();
   let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
   let handlers: ServerHandlers | null = null;
 
   function getHandlers(): ServerHandlers | null {
-    if (!projectRoot || !config) return null;
+    if (!projectRoot || !config) {
+      return null;
+    }
     if (!handlers) {
-      handlers = createServerHandlers(projectRoot, config, registry, templateRegistry, (params) =>
-        connection.sendDiagnostics(params),
+      handlers = createServerHandlers(
+        projectRoot,
+        config,
+        registry,
+        templateRegistry,
+        passagePositions,
+        (params) => connection.sendDiagnostics(params),
       );
     }
     return handlers;
@@ -117,9 +136,15 @@ export function startServer(): void {
       const result = await buildRegistries(projectRoot, config);
       registry = result.registry;
       templateRegistry = result.templateRegistry;
+      passagePositions = result.passagePositions;
       // Recreate handlers with updated registries
-      handlers = createServerHandlers(projectRoot, config, registry, templateRegistry, (params) =>
-        connection.sendDiagnostics(params),
+      handlers = createServerHandlers(
+        projectRoot,
+        config,
+        registry,
+        templateRegistry,
+        passagePositions,
+        (params) => connection.sendDiagnostics(params),
       );
     } catch (err) {
       connection.console.error(`Failed to rebuild registry: ${err}`);
@@ -140,7 +165,9 @@ export function startServer(): void {
 
   documents.onDidChangeContent((change) => {
     const h = getHandlers();
-    if (!h) return;
+    if (!h) {
+      return;
+    }
     let filePath: string;
     try {
       filePath = fileURLToPath(change.document.uri);
@@ -155,7 +182,9 @@ export function startServer(): void {
 
   documents.onDidSave((change) => {
     const h = getHandlers();
-    if (!h) return;
+    if (!h) {
+      return;
+    }
     let filePath: string;
     try {
       filePath = fileURLToPath(change.document.uri);

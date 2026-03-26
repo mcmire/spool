@@ -5,6 +5,12 @@ export type ParseError = {
   message: string;
 };
 
+export type RangeMarker =
+  | { type: "START" }
+  | { type: "END" }
+  | { type: "start"; passageName: string }
+  | { type: "end"; passageName: string };
+
 export type PassageReference = {
   filePath: string;
   passageName: string | undefined;
@@ -12,6 +18,9 @@ export type PassageReference = {
   line: number;
   column: number;
   raw: string;
+  isRange: boolean;
+  rangeStart?: RangeMarker;
+  rangeEnd?: RangeMarker;
 };
 
 export type NestedRef = {
@@ -29,6 +38,8 @@ const SOURCE_ANNOTATION_RE = /^(.*?)(?:==\s*)?::SPOOL::\s+(start|end)\(#([\w-]+)
 const SOURCE_DIRECTIVE_RE = /^.*?::SPOOL::\s+(\S+)/;
 const SOURCE_IGNORE_RE = /^.*?::SPOOL::\s+(ignore-start|ignore-end|ignore-next)\s*$/;
 const PASSAGE_REFERENCE_RE = /^(.*?)::SPOOL::\s+<<(.+?)(?:#([\w-]+))?(?::([\w-]+))?>>/;
+const PASSAGE_RANGE_RE =
+  /^(.*?)::SPOOL::\s+<<(.+?)@((?:START|END|start\(#[\w-]+\)|end\(#[\w-]+\)))\.\.((?:START|END|start\(#[\w-]+\)|end\(#[\w-]+\)))>>/;
 
 function magicCommentError(line: string, lineNum: number): ParseError {
   const col = line.indexOf("::SPOOL::") + 1;
@@ -218,8 +229,26 @@ function malformedReferenceError(line: string, lineNum: number): ParseError {
     column: col,
     length,
     message:
-      "Expected reference to match '::SPOOL:: <<file-path>>' or '::SPOOL:: <<file-path#passage-id>>'",
+      "Expected reference to match '::SPOOL:: <<file>>', '::SPOOL:: <<file#passage>>', or '::SPOOL:: <<file@start..end>>'",
   };
+}
+
+function parseRangeMarker(marker: string): RangeMarker {
+  if (marker === "START") {
+    return { type: "START" };
+  }
+  if (marker === "END") {
+    return { type: "END" };
+  }
+  const startMatch = /^start\(#([\w-]+)\)$/.exec(marker);
+  if (startMatch) {
+    return { type: "start", passageName: startMatch[1]! };
+  }
+  const endMatch = /^end\(#([\w-]+)\)$/.exec(marker);
+  if (endMatch) {
+    return { type: "end", passageName: endMatch[1]! };
+  }
+  throw new Error(`Invalid marker: ${marker}`);
 }
 
 export function parsePassageReferences(content: string): {
@@ -232,8 +261,42 @@ export function parsePassageReferences(content: string): {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+    const rangeMatch = PASSAGE_RANGE_RE.exec(line);
+    if (rangeMatch) {
+      const rangeStartStr = rangeMatch[3]!;
+      const rangeEndStr = rangeMatch[4]!;
+      let rangeStart: RangeMarker;
+      let rangeEnd: RangeMarker;
+      try {
+        rangeStart = parseRangeMarker(rangeStartStr);
+        rangeEnd = parseRangeMarker(rangeEndStr);
+      } catch {
+        errors.push({
+          line: i + 1,
+          column: line.indexOf("::SPOOL::") + 1,
+          message: "Invalid range marker",
+        });
+        continue;
+      }
+      refs.push({
+        filePath: rangeMatch[2]!,
+        passageName: undefined,
+        modifier: undefined,
+        line: i + 1,
+        column: rangeMatch[0]!.indexOf("::SPOOL::") + 1,
+        raw: `::SPOOL:: <<${rangeMatch[2]!}@${rangeStartStr}..${rangeEndStr}>>`,
+        isRange: true,
+        rangeStart,
+        rangeEnd,
+      });
+      continue;
+    }
     const match = PASSAGE_REFERENCE_RE.exec(line);
     if (match) {
+      if (match[2]!.includes("@")) {
+        errors.push(malformedReferenceError(line, i + 1));
+        continue;
+      }
       const passageName = match[3];
       const modifier = match[4];
       let raw: string;
@@ -253,6 +316,7 @@ export function parsePassageReferences(content: string): {
         line: i + 1,
         column: match[0]!.indexOf("::SPOOL::") + 1,
         raw,
+        isRange: false,
       });
     } else if (line.includes("::SPOOL::")) {
       errors.push(malformedReferenceError(line, i + 1));

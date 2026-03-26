@@ -9,6 +9,11 @@ import type { SpoolConfig } from "./config.ts";
 export type PassageRegistry = Map<string, string>;
 export type PassageTemplateRegistry = Map<string, string>;
 
+export type PassagePositions = Map<string, FilePositions>;
+export type FilePositions = Map<string, { startLine: number; endLine: number }>;
+
+export const WHOLE_FILE_KEY = "";
+
 export type FileErrors = {
   filePath: string;
   errors: ParseError[];
@@ -32,10 +37,12 @@ export async function buildRegistries(
 ): Promise<{
   registry: PassageRegistry;
   templateRegistry: PassageTemplateRegistry;
+  passagePositions: PassagePositions;
   errors: FileErrors[];
 }> {
   const registry: PassageRegistry = new Map();
   const templateRegistry: PassageTemplateRegistry = new Map();
+  const passagePositions: PassagePositions = new Map();
   const allErrors: FileErrors[] = [];
   const sourceDir = join(projectRoot, config.source.code);
   const docsDir = join(projectRoot, config.source.docs);
@@ -71,13 +78,26 @@ export async function buildRegistries(
         allErrors.push({ filePath: relPath, errors });
       }
 
+      const filePositions: FilePositions = new Map();
+      const wholeFileLines = wholeFile.split("\n");
+      // The empty string key represents whole-file positions (used for @START/@END markers).
+      filePositions.set(WHOLE_FILE_KEY, { startLine: 1, endLine: wholeFileLines.length });
+
+      // Register passage positions using whole-file indices (startIdx/endIdx are 0-based line indices).
+      for (const nested of wholeFileNestedRefs) {
+        filePositions.set(nested.name, {
+          startLine: nested.startIdx + 1,
+          endLine: nested.endIdx + 1,
+        });
+      }
+
       // Register the whole-file entry (keyed with an empty passage name).
       const wholeFileKey = `${relPath}:`;
       registry.set(wholeFileKey, wholeFile);
       if (wholeFileNestedRefs.length > 0) {
         templateRegistry.set(
           wholeFileKey,
-          buildTemplateContent(wholeFile.split("\n"), wholeFileNestedRefs, relPath),
+          buildTemplateContent(wholeFileLines, wholeFileNestedRefs, relPath),
         );
       } else {
         templateRegistry.set(wholeFileKey, wholeFile);
@@ -94,11 +114,13 @@ export async function buildRegistries(
           templateRegistry.set(key, value);
         }
       }
+
+      passagePositions.set(relPath, filePositions);
     } catch {
       // Skip files that can't be read as text
       continue;
     }
   }
 
-  return { registry, templateRegistry, errors: allErrors };
+  return { registry, templateRegistry, passagePositions, errors: allErrors };
 }

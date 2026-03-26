@@ -4,7 +4,11 @@ import { pathToFileURL } from "node:url";
 import { DiagnosticSeverity } from "vscode-languageserver/node.js";
 import type { Diagnostic } from "vscode-languageserver/node.js";
 import { createServerHandlers } from "./server.ts";
-import type { PassageRegistry, PassageTemplateRegistry } from "../../registries.ts";
+import type {
+  PassageRegistry,
+  PassageTemplateRegistry,
+  PassagePositions,
+} from "../../registries.ts";
 import type { SpoolConfig } from "../../config.ts";
 import { makeConfig } from "../../../tests/helpers.ts";
 
@@ -13,6 +17,7 @@ function makeHandlers(
   configOverrides?: Partial<SpoolConfig["source"]>,
   registry: PassageRegistry = new Map(),
   templateRegistry: PassageTemplateRegistry = new Map(),
+  passagePositions: PassagePositions = new Map(),
 ) {
   const sent: { uri: string; diagnostics: Diagnostic[] }[] = [];
   const handlers = createServerHandlers(
@@ -20,7 +25,8 @@ function makeHandlers(
     makeConfig(configOverrides),
     registry,
     templateRegistry,
-    (params) => sent.push(params),
+    passagePositions,
+    (params: { uri: string; diagnostics: Diagnostic[] }) => sent.push(params),
   );
   return { ...handlers, sent };
 }

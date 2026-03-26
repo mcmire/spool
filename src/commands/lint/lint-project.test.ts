@@ -80,6 +80,59 @@ describe("lintProject", () => {
       }));
   });
 
+  describe("when a doc file uses a valid range reference", () => {
+    test("returns no errors", () =>
+      withTempDir(async (root) => {
+        await createFile(
+          root,
+          "src/car.ts",
+          ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
+        );
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts@START..start(#car)>>");
+
+        const { registryErrors, docErrors } = await lintProject(root, makeConfig());
+
+        expect(registryErrors).toEqual([]);
+        expect(docErrors).toEqual([]);
+      }));
+  });
+
+  describe("when a doc file uses a range reference pointing to an unknown file", () => {
+    test("reports a doc error for that file", () =>
+      withTempDir(async (root) => {
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<missing.ts@START..END>>");
+
+        const { docErrors } = await lintProject(root, makeConfig());
+
+        expect(docErrors).toHaveLength(1);
+        expect(docErrors[0]!.filePath).toBe("docs/guide.md");
+        expect(docErrors[0]!.errors[0]!.message).toContain("Unknown reference");
+      }));
+  });
+
+  describe("when a doc file uses a range reference with an unknown named passage marker", () => {
+    test("reports a doc error for that file", () =>
+      withTempDir(async (root) => {
+        await createFile(
+          root,
+          "src/car.ts",
+          ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
+        );
+        await createFile(
+          root,
+          "docs/guide.md",
+          "// ::SPOOL:: <<car.ts@START..start(#missing)>>",
+        );
+
+        const { docErrors } = await lintProject(root, makeConfig());
+
+        expect(docErrors).toHaveLength(1);
+        expect(docErrors[0]!.filePath).toBe("docs/guide.md");
+        expect(docErrors[0]!.errors[0]!.message).toContain("Unknown passage in range");
+      }));
+  });
+
   describe("when a doc file references a passage from a file excluded by excludeFromCode", () => {
     test("reports a doc error because the passage is not in the registry", () =>
       withTempDir(async (root) => {

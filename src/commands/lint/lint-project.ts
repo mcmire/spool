@@ -4,7 +4,7 @@ import fg from "fast-glob";
 import type { SpoolConfig } from "../../config.ts";
 import { parsePassageReferences } from "../../parser.ts";
 import { buildRegistries } from "../../registries.ts";
-import type { FileErrors } from "../../registries.ts";
+import type { FileErrors, PassagePositions } from "../../registries.ts";
 
 export type LintResult = {
   registryErrors: FileErrors[];
@@ -12,7 +12,10 @@ export type LintResult = {
 };
 
 export async function lintProject(projectRoot: string, config: SpoolConfig): Promise<LintResult> {
-  const { registry, errors: registryErrors } = await buildRegistries(projectRoot, config);
+  const { registry, passagePositions, errors: registryErrors } = await buildRegistries(
+    projectRoot,
+    config,
+  );
 
   const docErrors: FileErrors[] = [];
   const docsDir = join(projectRoot, config.source.docs);
@@ -25,7 +28,35 @@ export async function lintProject(projectRoot: string, config: SpoolConfig): Pro
 
     const errors = [];
     for (const ref of refs) {
-      const key = `${posix.join(config.source.code, ref.filePath)}:${ref.passageName}`;
+      const fileRelPath = posix.join(config.source.code, ref.filePath);
+      if (ref.isRange) {
+        const wholeFileKey = `${fileRelPath}:`;
+        if (!registry.has(wholeFileKey)) {
+          errors.push({
+            line: ref.line,
+            column: ref.column,
+            message: `Unknown reference: ${ref.raw}`,
+          });
+          continue;
+        }
+        const filePositions = passagePositions.get(fileRelPath);
+        if (filePositions && ref.rangeStart && ref.rangeEnd) {
+          for (const marker of [ref.rangeStart, ref.rangeEnd]) {
+            if (
+              (marker.type === "start" || marker.type === "end") &&
+              !filePositions.has(marker.passageName)
+            ) {
+              errors.push({
+                line: ref.line,
+                column: ref.column,
+                message: `Unknown passage in range: #${marker.passageName}`,
+              });
+            }
+          }
+        }
+        continue;
+      }
+      const key = `${fileRelPath}:${ref.passageName ?? ""}`;
       if (!registry.has(key)) {
         errors.push({
           line: ref.line,

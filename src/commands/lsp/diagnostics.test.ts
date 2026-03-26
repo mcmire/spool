@@ -1,7 +1,12 @@
 import { test, expect, describe } from "vitest";
 import { DiagnosticSeverity } from "vscode-languageserver/node.js";
 import { getSourceFileDiagnostics, getDocFileDiagnostics } from "./diagnostics.ts";
-import type { PassageRegistry, PassageTemplateRegistry } from "../../registries.ts";
+import type {
+  PassageRegistry,
+  PassageTemplateRegistry,
+  PassagePositions,
+  FilePositions,
+} from "../../registries.ts";
 
 describe("getSourceFileDiagnostics", () => {
   describe("when the source contains no annotations", () => {
@@ -75,6 +80,8 @@ describe("getSourceFileDiagnostics", () => {
 });
 
 describe("getDocFileDiagnostics", () => {
+  const emptyPassagePositions: PassagePositions = new Map();
+
   describe("when the reference resolves to a known passage", () => {
     test("returns no diagnostics", () => {
       const registry: PassageRegistry = new Map([["src/car.ts:car", "export class Car {}"]]);
@@ -83,6 +90,7 @@ describe("getDocFileDiagnostics", () => {
         "// ::SPOOL:: <<car.ts#car>>",
         registry,
         templateRegistry,
+        emptyPassagePositions,
         "src",
       );
       expect(diagnostics).toEqual([]);
@@ -97,6 +105,7 @@ describe("getDocFileDiagnostics", () => {
         "// ::SPOOL:: <<car.ts#car:no-expand-nested>>",
         registry,
         templateRegistry,
+        emptyPassagePositions,
         "src",
       );
       expect(diagnostics).toEqual([]);
@@ -111,6 +120,7 @@ describe("getDocFileDiagnostics", () => {
         "// ::SPOOL:: <<car.ts#car>>",
         registry,
         templateRegistry,
+        emptyPassagePositions,
         "src",
       );
       expect(diagnostics).toEqual([
@@ -135,6 +145,7 @@ describe("getDocFileDiagnostics", () => {
         "// ::SPOOL:: <<car.ts#car>>",
         registry,
         templateRegistry,
+        emptyPassagePositions,
         "src",
       );
       expect(diagnostics).toEqual([
@@ -159,6 +170,7 @@ describe("getDocFileDiagnostics", () => {
         "// ::SPOOL:: <<car.ts#car:bad-modifier>>",
         registry,
         templateRegistry,
+        emptyPassagePositions,
         "src",
       );
       expect(diagnostics).toEqual([
@@ -183,6 +195,7 @@ describe("getDocFileDiagnostics", () => {
         "// ::SPOOL:: <<car.ts#car:no-expand-nested>>",
         registry,
         templateRegistry,
+        emptyPassagePositions,
         "src",
       );
       expect(diagnostics).toEqual([
@@ -203,7 +216,13 @@ describe("getDocFileDiagnostics", () => {
     test("returns a parse error diagnostic", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
-      const diagnostics = getDocFileDiagnostics("// ::SPOOL::", registry, templateRegistry, "src");
+      const diagnostics = getDocFileDiagnostics(
+        "// ::SPOOL::",
+        registry,
+        templateRegistry,
+        emptyPassagePositions,
+        "src",
+      );
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
@@ -212,7 +231,79 @@ describe("getDocFileDiagnostics", () => {
             end: { line: 0, character: 12 },
           },
           message:
-            "Expected reference to match '::SPOOL:: <<file-path>>' or '::SPOOL:: <<file-path#passage-id>>'",
+            "Expected reference to match '::SPOOL:: <<file>>', '::SPOOL:: <<file#passage>>', or '::SPOOL:: <<file@start..end>>'",
+          source: "spool",
+        },
+      ]);
+    });
+  });
+
+  describe("when the doc contains a valid range reference", () => {
+    test("returns no diagnostics", () => {
+      const registry: PassageRegistry = new Map([["src/cli.ts:", "const x = 1;"]]);
+      const templateRegistry: PassageTemplateRegistry = new Map();
+      const filePositions: FilePositions = new Map([
+        ["", { startLine: 1, endLine: 1 }],
+        ["weave", { startLine: 1, endLine: 1 }],
+      ]);
+      const passagePositions: PassagePositions = new Map([["src/cli.ts", filePositions]]);
+      const diagnostics = getDocFileDiagnostics(
+        "// ::SPOOL:: <<cli.ts@START..start(#weave)>>",
+        registry,
+        templateRegistry,
+        passagePositions,
+        "src",
+      );
+      expect(diagnostics).toEqual([]);
+    });
+  });
+
+  describe("when a range reference points to an unknown file", () => {
+    test("returns an 'Unknown file' diagnostic", () => {
+      const registry: PassageRegistry = new Map();
+      const templateRegistry: PassageTemplateRegistry = new Map();
+      const diagnostics = getDocFileDiagnostics(
+        "// ::SPOOL:: <<cli.ts@START..END>>",
+        registry,
+        templateRegistry,
+        emptyPassagePositions,
+        "src",
+      );
+      expect(diagnostics).toEqual([
+        {
+          severity: DiagnosticSeverity.Error,
+          range: {
+            start: { line: 0, character: 3 },
+            end: { line: 0, character: 34 },
+          },
+          message: "Unknown file: src/cli.ts",
+          source: "spool",
+        },
+      ]);
+    });
+  });
+
+  describe("when a range reference uses an unknown named passage in a marker", () => {
+    test("returns an 'Unknown passage' diagnostic", () => {
+      const registry: PassageRegistry = new Map([["src/cli.ts:", "const x = 1;"]]);
+      const templateRegistry: PassageTemplateRegistry = new Map();
+      const filePositions: FilePositions = new Map([["", { startLine: 1, endLine: 1 }]]);
+      const passagePositions: PassagePositions = new Map([["src/cli.ts", filePositions]]);
+      const diagnostics = getDocFileDiagnostics(
+        "// ::SPOOL:: <<cli.ts@START..start(#missing)>>",
+        registry,
+        templateRegistry,
+        passagePositions,
+        "src",
+      );
+      expect(diagnostics).toEqual([
+        {
+          severity: DiagnosticSeverity.Error,
+          range: {
+            start: { line: 0, character: 3 },
+            end: { line: 0, character: 46 },
+          },
+          message: 'Unknown passage "#missing" in file cli.ts',
           source: "spool",
         },
       ]);
@@ -227,6 +318,7 @@ describe("getDocFileDiagnostics", () => {
         ["normal text", "// ::SPOOL:: <<car.ts#car>>"].join("\n"),
         registry,
         templateRegistry,
+        emptyPassagePositions,
         "src",
       );
       expect(diagnostics).toEqual([
