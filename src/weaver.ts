@@ -15,7 +15,10 @@ import { buildRegistries } from "./registries.ts";
 import type { SpoolConfig } from "./config.ts";
 
 // Returns a 1-indexed line number; caller uses slice(value - 1, ...) to get 0-indexed start.
-function resolveStartMarker(marker: RangeMarker, positions: FilePositions): number | undefined {
+export function resolveStartMarker(
+  marker: RangeMarker,
+  positions: FilePositions,
+): number | undefined {
   switch (marker.type) {
     case "START":
       return positions.get(WHOLE_FILE_KEY_VAL)?.startLine;
@@ -31,7 +34,10 @@ function resolveStartMarker(marker: RangeMarker, positions: FilePositions): numb
 // Returns a 0-indexed exclusive upper bound for slice(..., value).
 // start(#name) and end(#name) store 1-indexed line numbers, so subtract 1 to get
 // the exclusive index that stops just before the named passage boundary.
-function resolveEndMarker(marker: RangeMarker, positions: FilePositions): number | undefined {
+export function resolveEndMarker(
+  marker: RangeMarker,
+  positions: FilePositions,
+): number | undefined {
   switch (marker.type) {
     case "START": {
       const pos = positions.get(WHOLE_FILE_KEY_VAL);

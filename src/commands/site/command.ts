@@ -1,16 +1,17 @@
 import { watch } from "node:fs";
 import { join } from "node:path";
 import { findProjectRoot, loadConfig } from "../../config.ts";
-import type { SpoolConfig } from "../../config.ts";
-import { weaveProjectInMemory } from "../../weaver.ts";
 import type { FileErrors } from "../../registries.ts";
 import {
   prepareSiteDir,
   writeWovenFiles,
   writeVitePressConfig,
+  writeVitePressTheme,
   startDevServer,
   buildSite,
 } from "./vitepress.ts";
+import { weaveSiteFiles } from "./weave-site.ts";
+import type { WeaveSiteOptions } from "./weave-site.ts";
 
 type Writable = { write(s: string): void };
 
@@ -19,6 +20,8 @@ export type SiteDevCommandOptions = {
   stdout: Writable;
   stderr: Writable;
   port?: string;
+  verifyUniqueReferences?: boolean;
+  linkReferences?: boolean;
 };
 
 export type SiteDevCommandResult = {
@@ -29,6 +32,8 @@ export type SiteBuildCommandOptions = {
   cwd: string;
   stdout: Writable;
   stderr: Writable;
+  verifyUniqueReferences?: boolean;
+  linkReferences?: boolean;
 };
 
 export type SiteBuildCommandResult = {
@@ -48,16 +53,23 @@ export async function siteDevCommand({
   stdout,
   stderr,
   port: portOption,
+  verifyUniqueReferences,
+  linkReferences,
 }: SiteDevCommandOptions): Promise<SiteDevCommandResult> {
   const projectRoot = findProjectRoot(cwd);
   const config = await loadConfig(projectRoot);
+  const weaveOptions: WeaveSiteOptions = { verifyUniqueReferences, linkReferences };
 
-  const result = await weaveProjectInMemory(projectRoot, config);
+  const result = await weaveSiteFiles(projectRoot, config, weaveOptions);
   stdout.write(`Initial weave: ${result.files.size} file(s) written.\n`);
 
   await prepareSiteDir(projectRoot);
   await writeWovenFiles(projectRoot, result.files);
-  await writeVitePressConfig(projectRoot, config);
+  await writeVitePressConfig(projectRoot, config, {
+    linkReferences,
+    passageLocationMap: result.passageLocationMap,
+  });
+  await writeVitePressTheme(projectRoot);
 
   const siteDir = join(projectRoot, ".site");
   const startPort = portOption ? parseInt(portOption, 10) : 5173;
@@ -76,7 +88,7 @@ export async function siteDevCommand({
     }
     debounceTimer = setTimeout(async () => {
       try {
-        const r = await weaveProjectInMemory(projectRoot, config);
+        const r = await weaveSiteFiles(projectRoot, config, weaveOptions);
         await writeWovenFiles(projectRoot, r.files);
         stdout.write(`Re-wove: ${r.files.size} file(s) written.\n`);
       } catch (err) {
@@ -106,14 +118,22 @@ export async function siteBuildCommand({
   cwd,
   stdout,
   stderr,
+  verifyUniqueReferences,
+  linkReferences,
 }: SiteBuildCommandOptions): Promise<SiteBuildCommandResult> {
   const projectRoot = findProjectRoot(cwd);
   const config = await loadConfig(projectRoot);
 
-  const result = await weaveProjectInMemory(projectRoot, config);
+  const result = await weaveSiteFiles(projectRoot, config, {
+    verifyUniqueReferences,
+    linkReferences,
+  });
   stdout.write(`Initial weave: ${result.files.size} file(s) written.\n`);
 
-  const hasErrors = result.registryErrors.length > 0 || result.weaveErrors.length > 0;
+  const hasErrors =
+    result.registryErrors.length > 0 ||
+    result.weaveErrors.length > 0 ||
+    result.referenceErrors.length > 0;
 
   if (hasErrors) {
     if (result.registryErrors.length > 0) {
@@ -124,12 +144,20 @@ export async function siteBuildCommand({
       stderr.write("\nWeave errors:\n");
       printErrors(result.weaveErrors, stderr);
     }
+    if (result.referenceErrors.length > 0) {
+      stderr.write("\nReference errors:\n");
+      printErrors(result.referenceErrors, stderr);
+    }
     return { exitCode: 1 };
   }
 
   await prepareSiteDir(projectRoot);
   await writeWovenFiles(projectRoot, result.files);
-  await writeVitePressConfig(projectRoot, config);
+  await writeVitePressConfig(projectRoot, config, {
+    linkReferences,
+    passageLocationMap: result.passageLocationMap,
+  });
+  await writeVitePressTheme(projectRoot);
 
   const siteDir = join(projectRoot, ".site");
   await buildSite(siteDir);

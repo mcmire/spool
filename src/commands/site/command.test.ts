@@ -376,4 +376,81 @@ describe("siteBuildCommand", () => {
         expect(mockBuild).not.toHaveBeenCalled();
       }));
   });
+
+  describe("when verifyUniqueReferences is set and a passage is on multiple pages", () => {
+    test("returns exit code 1 with reference errors", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await createFile(root, "src/car.ts", "export function drive() {}");
+        await createFile(root, "docs/page1.md", "::SPOOL:: <<car.ts>>");
+        await createFile(root, "docs/page2.md", "::SPOOL:: <<car.ts>>");
+
+        const stderr = makeWritable();
+        const result = await siteBuildCommand({
+          cwd: root,
+          stdout: makeWritable(),
+          stderr,
+          verifyUniqueReferences: true,
+        });
+
+        expect(result.exitCode).toBe(1);
+        expect(stderr.output).toContain("Reference errors");
+      }));
+  });
+
+  describe("when linkReferences is set", () => {
+    test("includes the shiki transformer in the VitePress config", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await createFile(root, "src/car.ts", "export function drive() {}");
+        await createFile(root, "docs/guide.md", "::SPOOL:: <<car.ts>>");
+
+        await siteBuildCommand({
+          cwd: root,
+          stdout: makeWritable(),
+          stderr: makeWritable(),
+          linkReferences: true,
+        });
+
+        const config = await readFile(join(root, ".site", ".vitepress", "config.js"), "utf-8");
+        expect(config).toContain("spoolLinkTransformer");
+        expect(config).toContain("passageMap");
+      }));
+  });
+});
+
+describe("writeVitePressTheme", () => {
+  describe("when siteDevCommand is called", () => {
+    test("writes the theme index.ts file", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/index.md", "# Hello");
+
+        await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
+
+        const themeIndex = await readFile(
+          join(root, ".site", ".vitepress", "theme", "index.ts"),
+          "utf-8",
+        );
+        expect(themeIndex).toContain("SpoolPassage");
+        expect(themeIndex).toContain("DefaultTheme");
+      }));
+
+    test("writes the SpoolPassage.vue component", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/index.md", "# Hello");
+
+        await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
+
+        const component = await readFile(
+          join(root, ".site", ".vitepress", "theme", "SpoolPassage.vue"),
+          "utf-8",
+        );
+        expect(component).toContain("spool-passage");
+        expect(component).toContain("anchor");
+      }));
+  });
 });

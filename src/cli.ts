@@ -43,18 +43,29 @@ program
 
 const site = program
   .command("site")
-  .description("Build and serve a documentation site from woven output");
+  .description("Build and serve a documentation site from woven output")
+  .option("--verify-unique-references", "Error if any passage is referenced on multiple pages")
+  .option(
+    "--link-references",
+    "Link unexpanded passage references to the page where they are expanded (implies --verify-unique-references)",
+  );
 
 site
   .command("dev")
   .description("Start a development server with live reloading")
   .option("-p, --port <port>", "Port to listen on", "5173")
   .action(async (options: { port?: string }) => {
+    const parentOpts = site.opts() as {
+      verifyUniqueReferences?: boolean;
+      linkReferences?: boolean;
+    };
     const { siteDevCommand } = await import("./commands/site/command.ts");
     const { server } = await siteDevCommand({
       cwd: process.cwd(),
       stdout: process.stdout,
       stderr: process.stderr,
+      verifyUniqueReferences: parentOpts.verifyUniqueReferences || parentOpts.linkReferences,
+      linkReferences: parentOpts.linkReferences,
       ...options,
     });
     process.on("SIGINT", () => {
@@ -78,11 +89,17 @@ site
   .command("build")
   .description("Build the documentation site for production")
   .action(async () => {
+    const parentOpts = site.opts() as {
+      verifyUniqueReferences?: boolean;
+      linkReferences?: boolean;
+    };
     const { siteBuildCommand } = await import("./commands/site/command.ts");
     const result = await siteBuildCommand({
       cwd: process.cwd(),
       stdout: process.stdout,
       stderr: process.stderr,
+      verifyUniqueReferences: parentOpts.verifyUniqueReferences || parentOpts.linkReferences,
+      linkReferences: parentOpts.linkReferences,
     });
     if (result.exitCode !== undefined) {
       process.exitCode = result.exitCode;

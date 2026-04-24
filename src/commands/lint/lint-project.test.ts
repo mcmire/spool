@@ -119,11 +119,7 @@ describe("lintProject", () => {
           "src/car.ts",
           ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
         );
-        await createFile(
-          root,
-          "docs/guide.md",
-          "// ::SPOOL:: <<car.ts@START..start(#missing)>>",
-        );
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts@START..start(#missing)>>");
 
         const { docErrors } = await lintProject(root, makeConfig());
 

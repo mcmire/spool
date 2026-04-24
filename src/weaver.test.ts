@@ -198,9 +198,7 @@ describe("weaveFile", () => {
 
   describe("when the doc contains a range reference with START..END markers", () => {
     test("replaces that line with the full file content", () => {
-      const filePositions: FilePositions = new Map([
-        ["", { startLine: 1, endLine: 3 }],
-      ]);
+      const filePositions: FilePositions = new Map([["", { startLine: 1, endLine: 3 }]]);
       const passagePositions: PassagePositions = new Map([["src/cli.ts", filePositions]]);
       const { registry, templateRegistry } = makeRegistries({
         "src/cli.ts:": { registry: "line A\nline B\nline C" },
