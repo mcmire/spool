@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { join, extname, relative, posix } from "node:path";
+import { join, extname, relative } from "node:path";
 import fg from "fast-glob";
 import type { ParseError } from "../../parser.ts";
 import { parsePassageReferences, VALID_MODIFIERS } from "../../parser.ts";
@@ -88,7 +88,6 @@ export function weaveSiteFile(
   registry: PassageRegistry,
   templateRegistry: PassageTemplateRegistry,
   passagePositions: PassagePositions,
-  sourceDir: string,
   passageLocationMap: PassageLocationMap | undefined,
 ): { output: string; errors: ParseError[] } {
   const { refs, errors } = parsePassageReferences(docContent);
@@ -104,7 +103,7 @@ export function weaveSiteFile(
       continue;
     }
 
-    const fullPath = posix.join(sourceDir, ref.filePath);
+    const fullPath = ref.filePath;
     const positions = passagePositions.get(fullPath);
     const wholeFileKey = `${fullPath}:`;
     const wholeFileContent = registry.get(wholeFileKey);
@@ -142,7 +141,7 @@ export function weaveSiteFile(
 
       const wholeLines = wholeFileContent.split("\n");
       const rangeContent = wholeLines.slice(startLine - 1, endLine).join("\n");
-      const refKey = referenceKey(sourceDir, ref.filePath, undefined, ref.rangeStart, ref.rangeEnd);
+      const refKey = referenceKey(ref.filePath, undefined, ref.rangeStart, ref.rangeEnd);
       const anchorId = passageLocationMap?.get(refKey)?.anchorId;
       clearSurroundingFence(lines, ref.line - 1);
       lines[ref.line - 1] = wrapPassage(rangeContent, ref.filePath, anchorId);
@@ -159,7 +158,7 @@ export function weaveSiteFile(
         message: `Unknown reference: ${ref.raw}`,
       });
     } else {
-      const refKey = referenceKey(sourceDir, ref.filePath, ref.passageName);
+      const refKey = referenceKey(ref.filePath, ref.passageName);
       const anchorId = passageLocationMap?.get(refKey)?.anchorId;
       clearSurroundingFence(lines, ref.line - 1);
       lines[ref.line - 1] = wrapPassage(passageContent, ref.filePath, anchorId);
@@ -214,7 +213,7 @@ export async function weaveSiteFiles(
   let passageLocationMap: PassageLocationMap = new Map();
 
   if (options.verifyUniqueReferences || options.linkReferences) {
-    const refMap = buildReferenceMap(rawDocContents, config.source.code);
+    const refMap = buildReferenceMap(rawDocContents);
     const uniqueErrors = verifyUniqueReferences(refMap);
     if (uniqueErrors.length > 0) {
       referenceErrors.push({ filePath: "(cross-file)", errors: uniqueErrors });
@@ -233,7 +232,6 @@ export async function weaveSiteFiles(
       registry,
       templateRegistry,
       passagePositions,
-      config.source.code,
       options.linkReferences ? passageLocationMap : undefined,
     );
 

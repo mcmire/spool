@@ -350,7 +350,7 @@ describe("siteBuildCommand", () => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
         // Reference a passage that doesn't exist
-        await createFile(root, "docs/guide.md", "::SPOOL:: <<missing.ts#passage>>");
+        await createFile(root, "docs/guide.md", "::SPOOL:: <<src/missing.ts#passage>>");
 
         const result = await siteBuildCommand({
           cwd: root,
@@ -365,7 +365,7 @@ describe("siteBuildCommand", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/guide.md", "::SPOOL:: <<missing.ts#passage>>");
+        await createFile(root, "docs/guide.md", "::SPOOL:: <<src/missing.ts#passage>>");
 
         await siteBuildCommand({
           cwd: root,
@@ -382,8 +382,8 @@ describe("siteBuildCommand", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await createFile(root, "src/car.ts", "export function drive() {}");
-        await createFile(root, "docs/page1.md", "::SPOOL:: <<car.ts>>");
-        await createFile(root, "docs/page2.md", "::SPOOL:: <<car.ts>>");
+        await createFile(root, "docs/page1.md", "::SPOOL:: <<src/car.ts>>");
+        await createFile(root, "docs/page2.md", "::SPOOL:: <<src/car.ts>>");
 
         const stderr = makeWritable();
         const result = await siteBuildCommand({
@@ -403,7 +403,7 @@ describe("siteBuildCommand", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await createFile(root, "src/car.ts", "export function drive() {}");
-        await createFile(root, "docs/guide.md", "::SPOOL:: <<car.ts>>");
+        await createFile(root, "docs/guide.md", "::SPOOL:: <<src/car.ts>>");
 
         await siteBuildCommand({
           cwd: root,

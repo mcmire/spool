@@ -63,7 +63,6 @@ export function createServerHandlers(
         registry,
         templateRegistry,
         passagePositions,
-        config.source.code,
       );
     } else {
       return [];
@@ -126,6 +125,9 @@ export function startServer(): void {
 
   connection.onInitialized(async () => {
     await rebuildRegistries();
+    for (const doc of documents.all()) {
+      getHandlers()?.validateDocument(doc.uri, doc.getText());
+    }
   });
 
   async function rebuildRegistries(): Promise<void> {

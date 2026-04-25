@@ -1,4 +1,3 @@
-import { posix } from "node:path";
 import { parsePassageReferences } from "../../parser.ts";
 import type { ParseError, RangeMarker } from "../../parser.ts";
 
@@ -33,17 +32,15 @@ function stringifyRangeMarker(marker: RangeMarker): string {
 }
 
 export function referenceKey(
-  sourceDir: string,
   filePath: string,
   passageName: string | undefined,
   rangeStart?: RangeMarker,
   rangeEnd?: RangeMarker,
 ): string {
-  const fullPath = posix.join(sourceDir, filePath);
   if (rangeStart && rangeEnd) {
-    return `${fullPath}@${stringifyRangeMarker(rangeStart)}..${stringifyRangeMarker(rangeEnd)}`;
+    return `${filePath}@${stringifyRangeMarker(rangeStart)}..${stringifyRangeMarker(rangeEnd)}`;
   }
-  return passageName !== undefined ? `${fullPath}:${passageName}` : `${fullPath}:`;
+  return passageName !== undefined ? `${filePath}:${passageName}` : `${filePath}:`;
 }
 
 export function passageAnchorId(refKey: string): string {
@@ -66,7 +63,6 @@ export function docPathToUrl(docPath: string): string {
  */
 export function buildReferenceMap(
   docContents: Map<string, string>,
-  sourceDir: string,
 ): ReferenceMap {
   const map: ReferenceMap = new Map();
 
@@ -74,7 +70,6 @@ export function buildReferenceMap(
     const { refs } = parsePassageReferences(content);
     for (const ref of refs) {
       const key = referenceKey(
-        sourceDir,
         ref.filePath,
         ref.passageName,
         ref.rangeStart,

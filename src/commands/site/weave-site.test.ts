@@ -58,11 +58,10 @@ describe("weaveSiteFile", () => {
       });
 
       const { output, errors } = weaveSiteFile(
-        "// ::SPOOL:: <<car.ts#drive>>",
+        "// ::SPOOL:: <<src/car.ts#drive>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
         undefined,
       );
 
@@ -91,11 +90,10 @@ describe("weaveSiteFile", () => {
       ]);
 
       const { output, errors } = weaveSiteFile(
-        "// ::SPOOL:: <<car.ts#drive>>",
+        "// ::SPOOL:: <<src/car.ts#drive>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
         locationMap,
       );
 
@@ -111,11 +109,10 @@ describe("weaveSiteFile", () => {
       });
 
       const { output } = weaveSiteFile(
-        "::SPOOL:: <<style.css>>",
+        "::SPOOL:: <<src/style.css>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
         undefined,
       );
 
@@ -134,11 +131,10 @@ describe("weaveSiteFile", () => {
       });
 
       const { output } = weaveSiteFile(
-        "::SPOOL:: <<cli.ts:no-expand-nested>>",
+        "::SPOOL:: <<src/cli.ts:no-expand-nested>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
         undefined,
       );
 
@@ -151,11 +147,10 @@ describe("weaveSiteFile", () => {
       const { registry, templateRegistry, passagePositions } = makeRegistries({});
 
       const { errors } = weaveSiteFile(
-        "::SPOOL:: <<missing.ts#foo>>",
+        "::SPOOL:: <<src/missing.ts#foo>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
         undefined,
       );
 
@@ -171,11 +166,10 @@ describe("weaveSiteFile", () => {
       });
 
       const { output, errors } = weaveSiteFile(
-        "```ts\n// ::SPOOL:: <<car.ts#drive>>\n```",
+        "```ts\n// ::SPOOL:: <<src/car.ts#drive>>\n```",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
         undefined,
       );
 
@@ -195,11 +189,10 @@ describe("weaveSiteFile", () => {
       });
 
       const { output } = weaveSiteFile(
-        "# Guide\n\nHere is the code:\n\n// ::SPOOL:: <<car.ts#drive>>",
+        "# Guide\n\nHere is the code:\n\n// ::SPOOL:: <<src/car.ts#drive>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
         undefined,
       );
 
@@ -214,7 +207,7 @@ describe("weaveSiteFiles", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await createFile(root, "src/car.ts", "export function drive() {}");
-        await createFile(root, "docs/guide.md", "# Guide\n\n::SPOOL:: <<car.ts>>");
+        await createFile(root, "docs/guide.md", "# Guide\n\n::SPOOL:: <<src/car.ts>>");
 
         const result = await weaveSiteFiles(root, {
           source: { code: "src", docs: "docs" },
@@ -234,7 +227,7 @@ describe("weaveSiteFiles", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await createFile(root, "src/car.ts", "export function drive() {}");
-        await createFile(root, "docs/guide.md", "::SPOOL:: <<car.ts>>");
+        await createFile(root, "docs/guide.md", "::SPOOL:: <<src/car.ts>>");
 
         const result = await weaveSiteFiles(
           root,
@@ -251,8 +244,8 @@ describe("weaveSiteFiles", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await createFile(root, "src/car.ts", "export function drive() {}");
-        await createFile(root, "docs/page1.md", "::SPOOL:: <<car.ts>>");
-        await createFile(root, "docs/page2.md", "::SPOOL:: <<car.ts>>");
+        await createFile(root, "docs/page1.md", "::SPOOL:: <<src/car.ts>>");
+        await createFile(root, "docs/page2.md", "::SPOOL:: <<src/car.ts>>");
 
         const result = await weaveSiteFiles(
           root,
@@ -270,7 +263,7 @@ describe("weaveSiteFiles", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await createFile(root, "src/car.ts", "export function drive() {}");
-        await createFile(root, "docs/guide.md", "::SPOOL:: <<car.ts>>");
+        await createFile(root, "docs/guide.md", "::SPOOL:: <<src/car.ts>>");
 
         const result = await weaveSiteFiles(
           root,
@@ -286,7 +279,7 @@ describe("weaveSiteFiles", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await createFile(root, "src/car.ts", "export function drive() {}");
-        await createFile(root, "docs/guide.md", "::SPOOL:: <<car.ts>>");
+        await createFile(root, "docs/guide.md", "::SPOOL:: <<src/car.ts>>");
 
         const result = await weaveSiteFiles(
           root,

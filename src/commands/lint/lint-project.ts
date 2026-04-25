@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { join, relative, posix } from "node:path";
+import { join, relative } from "node:path";
 import fg from "fast-glob";
 import type { SpoolConfig } from "../../config.ts";
 import { parsePassageReferences } from "../../parser.ts";
@@ -28,7 +28,7 @@ export async function lintProject(projectRoot: string, config: SpoolConfig): Pro
 
     const errors = [];
     for (const ref of refs) {
-      const fileRelPath = posix.join(config.source.code, ref.filePath);
+      const fileRelPath = ref.filePath;
       if (ref.isRange) {
         const wholeFileKey = `${fileRelPath}:`;
         if (!registry.has(wholeFileKey)) {

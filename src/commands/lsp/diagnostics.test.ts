@@ -87,11 +87,10 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map([["src/car.ts:car", "export class Car {}"]]);
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        "// ::SPOOL:: <<car.ts#car>>",
+        "// ::SPOOL:: <<src/car.ts#car>>",
         registry,
         templateRegistry,
         emptyPassagePositions,
-        "src",
       );
       expect(diagnostics).toEqual([]);
     });
@@ -102,11 +101,10 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map([["src/car.ts:car", "code"]]);
       const diagnostics = getDocFileDiagnostics(
-        "// ::SPOOL:: <<car.ts#car:no-expand-nested>>",
+        "// ::SPOOL:: <<src/car.ts#car:no-expand-nested>>",
         registry,
         templateRegistry,
         emptyPassagePositions,
-        "src",
       );
       expect(diagnostics).toEqual([]);
     });
@@ -117,18 +115,17 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        "// ::SPOOL:: <<car.ts#car>>",
+        "// ::SPOOL:: <<src/car.ts#car>>",
         registry,
         templateRegistry,
         emptyPassagePositions,
-        "src",
       );
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 27 },
+            end: { line: 0, character: 31 },
           },
           message: "Unknown file: src/car.ts",
           source: "spool",
@@ -142,18 +139,17 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map([["src/car.ts:boat", "code"]]);
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        "// ::SPOOL:: <<car.ts#car>>",
+        "// ::SPOOL:: <<src/car.ts#car>>",
         registry,
         templateRegistry,
         emptyPassagePositions,
-        "src",
       );
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 27 },
+            end: { line: 0, character: 31 },
           },
           message: 'Unknown passage ID "car" in file src/car.ts',
           source: "spool",
@@ -167,18 +163,17 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map([["src/car.ts:car", "code"]]);
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        "// ::SPOOL:: <<car.ts#car:bad-modifier>>",
+        "// ::SPOOL:: <<src/car.ts#car:bad-modifier>>",
         registry,
         templateRegistry,
         emptyPassagePositions,
-        "src",
       );
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 40 },
+            end: { line: 0, character: 44 },
           },
           message: "Unknown modifier: bad-modifier",
           source: "spool",
@@ -192,18 +187,17 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        "// ::SPOOL:: <<car.ts#car:no-expand-nested>>",
+        "// ::SPOOL:: <<src/car.ts#car:no-expand-nested>>",
         registry,
         templateRegistry,
         emptyPassagePositions,
-        "src",
       );
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 44 },
+            end: { line: 0, character: 48 },
           },
           message: "Unknown file: src/car.ts",
           source: "spool",
@@ -221,7 +215,6 @@ describe("getDocFileDiagnostics", () => {
         registry,
         templateRegistry,
         emptyPassagePositions,
-        "src",
       );
       expect(diagnostics).toEqual([
         {
@@ -248,11 +241,10 @@ describe("getDocFileDiagnostics", () => {
       ]);
       const passagePositions: PassagePositions = new Map([["src/cli.ts", filePositions]]);
       const diagnostics = getDocFileDiagnostics(
-        "// ::SPOOL:: <<cli.ts@START..start(#weave)>>",
+        "// ::SPOOL:: <<src/cli.ts@START..start(#weave)>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
       expect(diagnostics).toEqual([]);
     });
@@ -263,18 +255,17 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        "// ::SPOOL:: <<cli.ts@START..END>>",
+        "// ::SPOOL:: <<src/cli.ts@START..END>>",
         registry,
         templateRegistry,
         emptyPassagePositions,
-        "src",
       );
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 34 },
+            end: { line: 0, character: 38 },
           },
           message: "Unknown file: src/cli.ts",
           source: "spool",
@@ -290,20 +281,19 @@ describe("getDocFileDiagnostics", () => {
       const filePositions: FilePositions = new Map([["", { startLine: 1, endLine: 1 }]]);
       const passagePositions: PassagePositions = new Map([["src/cli.ts", filePositions]]);
       const diagnostics = getDocFileDiagnostics(
-        "// ::SPOOL:: <<cli.ts@START..start(#missing)>>",
+        "// ::SPOOL:: <<src/cli.ts@START..start(#missing)>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 0, character: 3 },
-            end: { line: 0, character: 46 },
+            end: { line: 0, character: 50 },
           },
-          message: 'Unknown passage "#missing" in file cli.ts',
+          message: 'Unknown passage "#missing" in file src/cli.ts',
           source: "spool",
         },
       ]);
@@ -315,18 +305,17 @@ describe("getDocFileDiagnostics", () => {
       const registry: PassageRegistry = new Map();
       const templateRegistry: PassageTemplateRegistry = new Map();
       const diagnostics = getDocFileDiagnostics(
-        ["normal text", "// ::SPOOL:: <<car.ts#car>>"].join("\n"),
+        ["normal text", "// ::SPOOL:: <<src/car.ts#car>>"].join("\n"),
         registry,
         templateRegistry,
         emptyPassagePositions,
-        "src",
       );
       expect(diagnostics).toEqual([
         {
           severity: DiagnosticSeverity.Error,
           range: {
             start: { line: 1, character: 3 },
-            end: { line: 1, character: 27 },
+            end: { line: 1, character: 31 },
           },
           message: "Unknown file: src/car.ts",
           source: "spool",

@@ -38,11 +38,10 @@ describe("weaveFile", () => {
       });
 
       const { output, errors } = weaveFile(
-        "// ::SPOOL:: <<car.ts#car>>",
+        "// ::SPOOL:: <<src/car.ts#car>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toEqual([]);
@@ -59,9 +58,9 @@ describe("weaveFile", () => {
 
       const doc = [
         "## Car",
-        "// ::SPOOL:: <<car.ts#car>>",
+        "// ::SPOOL:: <<src/car.ts#car>>",
         "## Boat",
-        "// ::SPOOL:: <<boat.ts#boat>>",
+        "// ::SPOOL:: <<src/boat.ts#boat>>",
       ].join("\n");
 
       const { output, errors } = weaveFile(
@@ -69,7 +68,6 @@ describe("weaveFile", () => {
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toEqual([]);
@@ -87,11 +85,10 @@ describe("weaveFile", () => {
       });
 
       const { output, errors } = weaveFile(
-        "// ::SPOOL:: <<vehicle.ts#outer:no-expand-nested>>",
+        "// ::SPOOL:: <<src/vehicle.ts#outer:no-expand-nested>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toEqual([]);
@@ -106,11 +103,10 @@ describe("weaveFile", () => {
       });
 
       const { output, errors } = weaveFile(
-        "// ::SPOOL:: <<cli.ts>>",
+        "// ::SPOOL:: <<src/cli.ts>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toEqual([]);
@@ -126,11 +122,10 @@ describe("weaveFile", () => {
       });
 
       const { output, errors } = weaveFile(
-        "// ::SPOOL:: <<cli.ts:no-expand-nested>>",
+        "// ::SPOOL:: <<src/cli.ts:no-expand-nested>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toEqual([]);
@@ -142,13 +137,12 @@ describe("weaveFile", () => {
     test("reports an error and leaves the line unchanged", () => {
       const { registry, templateRegistry, passagePositions } = makeRegistries({});
 
-      const refLine = "// ::SPOOL:: <<car.ts#car>>";
+      const refLine = "// ::SPOOL:: <<src/car.ts#car>>";
       const { output, errors } = weaveFile(
         refLine,
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toHaveLength(1);
@@ -163,13 +157,12 @@ describe("weaveFile", () => {
         "src/car.ts:car": { registry: "class Car {}" },
       });
 
-      const refLine = "// ::SPOOL:: <<car.ts#car:bad-modifier>>";
+      const refLine = "// ::SPOOL:: <<src/car.ts#car:bad-modifier>>";
       const { output, errors } = weaveFile(
         refLine,
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toHaveLength(1);
@@ -188,7 +181,6 @@ describe("weaveFile", () => {
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toEqual([]);
@@ -205,11 +197,10 @@ describe("weaveFile", () => {
       });
 
       const { output, errors } = weaveFile(
-        "// ::SPOOL:: <<cli.ts@START..END>>",
+        "// ::SPOOL:: <<src/cli.ts@START..END>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toEqual([]);
@@ -229,11 +220,10 @@ describe("weaveFile", () => {
       });
 
       const { output, errors } = weaveFile(
-        "// ::SPOOL:: <<cli.ts@START..start(#mid)>>",
+        "// ::SPOOL:: <<src/cli.ts@START..start(#mid)>>",
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toEqual([]);
@@ -245,13 +235,12 @@ describe("weaveFile", () => {
     test("reports an unknown reference error", () => {
       const { registry, templateRegistry, passagePositions } = makeRegistries({});
 
-      const refLine = "// ::SPOOL:: <<missing.ts@START..END>>";
+      const refLine = "// ::SPOOL:: <<src/missing.ts@START..END>>";
       const { output, errors } = weaveFile(
         refLine,
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toHaveLength(1);
@@ -268,13 +257,12 @@ describe("weaveFile", () => {
         "src/cli.ts:": { registry: "line A\nline B\nline C" },
       });
 
-      const refLine = "// ::SPOOL:: <<cli.ts@START..start(#missing)>>";
+      const refLine = "// ::SPOOL:: <<src/cli.ts@START..start(#missing)>>";
       const { output, errors } = weaveFile(
         refLine,
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toHaveLength(1);
@@ -292,7 +280,6 @@ describe("weaveFile", () => {
         registry,
         templateRegistry,
         passagePositions,
-        "src",
       );
 
       expect(errors).toHaveLength(1);
@@ -309,7 +296,7 @@ describe("weaveProject", () => {
           "src/car.ts",
           ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
         );
-        await createFile(root, "docs/guide.md", "# Guide\n// ::SPOOL:: <<car.ts#car>>");
+        await createFile(root, "docs/guide.md", "# Guide\n// ::SPOOL:: <<src/car.ts#car>>");
 
         await weaveProject(root, makeConfig());
 
@@ -329,7 +316,7 @@ describe("weaveProject", () => {
             "app.run();",
           ].join("\n"),
         );
-        await createFile(root, "docs/guide.md", "# Guide\n// ::SPOOL:: <<cli.ts>>");
+        await createFile(root, "docs/guide.md", "# Guide\n// ::SPOOL:: <<src/cli.ts>>");
 
         await weaveProject(root, makeConfig());
 
@@ -400,7 +387,7 @@ describe("weaveProject", () => {
     test("surfaces weave errors in the result", () =>
       withTempDir(async (root) => {
         await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#missing>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#missing>>");
 
         const { weaveErrors } = await weaveProject(root, makeConfig());
 
@@ -423,7 +410,7 @@ describe("weaveProject", () => {
             "// ::SPOOL:: end(#foo)",
           ].join("\n"),
         );
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<cli.ts@START..start(#foo)>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/cli.ts@START..start(#foo)>>");
 
         const { weaveErrors } = await weaveProject(root, makeConfig());
 

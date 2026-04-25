@@ -1,6 +1,5 @@
 import { DiagnosticSeverity } from "vscode-languageserver/node.js";
 import type { Diagnostic } from "vscode-languageserver/node.js";
-import { posix } from "node:path";
 import { parseSourcePassages, parsePassageReferences, VALID_MODIFIERS } from "../../parser.ts";
 import { WHOLE_FILE_KEY } from "../../registries.ts";
 import type {
@@ -66,7 +65,6 @@ export function getDocFileDiagnostics(
   registry: PassageRegistry,
   templateRegistry: PassageTemplateRegistry,
   passagePositions: PassagePositions,
-  sourceDir: string,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const { refs, errors: refErrors } = parsePassageReferences(content);
@@ -103,11 +101,9 @@ export function getDocFileDiagnostics(
       continue;
     }
 
-    const resolvedFilePath = posix.join(sourceDir, ref.filePath);
-
     if (ref.isRange && ref.rangeStart && ref.rangeEnd) {
-      const positions = passagePositions.get(resolvedFilePath);
-      const wholeFileKey = `${resolvedFilePath}:`;
+      const positions = passagePositions.get(ref.filePath);
+      const wholeFileKey = `${ref.filePath}:`;
       if (!registry.has(wholeFileKey)) {
         diagnostics.push({
           severity: DiagnosticSeverity.Error,
@@ -118,7 +114,7 @@ export function getDocFileDiagnostics(
               character: ref.column - 1 + ref.raw.length,
             },
           },
-          message: `Unknown file: ${resolvedFilePath}`,
+          message: `Unknown file: ${ref.filePath}`,
           source: "spool",
         });
         continue;
@@ -166,14 +162,14 @@ export function getDocFileDiagnostics(
 
     const key =
       ref.passageName !== undefined
-        ? `${resolvedFilePath}:${ref.passageName}`
-        : `${resolvedFilePath}:`;
+        ? `${ref.filePath}:${ref.passageName}`
+        : `${ref.filePath}:`;
     const source = ref.modifier === "no-expand-nested" ? templateRegistry : registry;
     if (!source.has(key)) {
       const message =
-        ref.passageName !== undefined && fileExistsInRegistry(resolvedFilePath, source)
-          ? `Unknown passage ID "${ref.passageName}" in file ${resolvedFilePath}`
-          : `Unknown file: ${resolvedFilePath}`;
+        ref.passageName !== undefined && fileExistsInRegistry(ref.filePath, source)
+          ? `Unknown passage ID "${ref.passageName}" in file ${ref.filePath}`
+          : `Unknown file: ${ref.filePath}`;
       diagnostics.push({
         severity: DiagnosticSeverity.Error,
         range: {

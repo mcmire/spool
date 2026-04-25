@@ -11,26 +11,25 @@ import {
 describe("referenceKey", () => {
   describe("when given a simple passage reference", () => {
     test("returns filePath:passageName", () => {
-      expect(referenceKey("src", "cli.ts", "lint")).toBe("src/cli.ts:lint");
+      expect(referenceKey("src/cli.ts", "lint")).toBe("src/cli.ts:lint");
     });
   });
 
   describe("when given a whole-file reference", () => {
     test("returns filePath: with empty passage", () => {
-      expect(referenceKey("src", "cli.ts", undefined)).toBe("src/cli.ts:");
+      expect(referenceKey("src/cli.ts", undefined)).toBe("src/cli.ts:");
     });
   });
 
   describe("when given a range reference", () => {
     test("returns filePath@start..end with stringified markers", () => {
-      const key = referenceKey("src", "cli.ts", undefined, { type: "START" }, { type: "END" });
+      const key = referenceKey("src/cli.ts", undefined, { type: "START" }, { type: "END" });
       expect(key).toBe("src/cli.ts@START..END");
     });
 
     test("includes passage names in named markers", () => {
       const key = referenceKey(
-        "src",
-        "cli.ts",
+        "src/cli.ts",
         undefined,
         { type: "start", passageName: "foo" },
         { type: "end", passageName: "bar" },
@@ -80,10 +79,10 @@ describe("buildReferenceMap", () => {
   describe("when docs contain passage references", () => {
     test("maps each reference key to its doc page", () => {
       const docs = new Map([
-        ["01-cli.md", "::SPOOL:: <<cli.ts#lint>>"],
-        ["02-lint.md", "::SPOOL:: <<cli.ts#lsp>>"],
+        ["01-cli.md", "::SPOOL:: <<src/cli.ts#lint>>"],
+        ["02-lint.md", "::SPOOL:: <<src/cli.ts#lsp>>"],
       ]);
-      const map = buildReferenceMap(docs, "src");
+      const map = buildReferenceMap(docs);
 
       expect(map.get("src/cli.ts:lint")).toEqual([{ docPath: "01-cli.md", line: 1 }]);
       expect(map.get("src/cli.ts:lsp")).toEqual([{ docPath: "02-lint.md", line: 1 }]);
@@ -93,10 +92,10 @@ describe("buildReferenceMap", () => {
   describe("when the same passage is referenced on multiple pages", () => {
     test("collects all locations", () => {
       const docs = new Map([
-        ["01-cli.md", "::SPOOL:: <<cli.ts#lint>>"],
-        ["02-lint.md", "::SPOOL:: <<cli.ts#lint>>"],
+        ["01-cli.md", "::SPOOL:: <<src/cli.ts#lint>>"],
+        ["02-lint.md", "::SPOOL:: <<src/cli.ts#lint>>"],
       ]);
-      const map = buildReferenceMap(docs, "src");
+      const map = buildReferenceMap(docs);
 
       expect(map.get("src/cli.ts:lint")).toEqual([
         { docPath: "01-cli.md", line: 1 },
@@ -107,8 +106,8 @@ describe("buildReferenceMap", () => {
 
   describe("when a doc contains a whole-file reference", () => {
     test("uses the filePath: key format", () => {
-      const docs = new Map([["index.md", "::SPOOL:: <<cli.ts>>"]]);
-      const map = buildReferenceMap(docs, "src");
+      const docs = new Map([["index.md", "::SPOOL:: <<src/cli.ts>>"]]);
+      const map = buildReferenceMap(docs);
 
       expect(map.has("src/cli.ts:")).toBe(true);
     });
@@ -119,10 +118,10 @@ describe("verifyUniqueReferences", () => {
   describe("when all references are unique across pages", () => {
     test("returns no errors", () => {
       const docs = new Map([
-        ["01-cli.md", "::SPOOL:: <<cli.ts#lint>>"],
-        ["02-lint.md", "::SPOOL:: <<cli.ts#lsp>>"],
+        ["01-cli.md", "::SPOOL:: <<src/cli.ts#lint>>"],
+        ["02-lint.md", "::SPOOL:: <<src/cli.ts#lsp>>"],
       ]);
-      const map = buildReferenceMap(docs, "src");
+      const map = buildReferenceMap(docs);
       const errors = verifyUniqueReferences(map);
 
       expect(errors).toEqual([]);
@@ -132,10 +131,10 @@ describe("verifyUniqueReferences", () => {
   describe("when a passage is referenced on multiple pages", () => {
     test("returns errors for each occurrence", () => {
       const docs = new Map([
-        ["01-cli.md", "::SPOOL:: <<cli.ts#lint>>"],
-        ["02-lint.md", "::SPOOL:: <<cli.ts#lint>>"],
+        ["01-cli.md", "::SPOOL:: <<src/cli.ts#lint>>"],
+        ["02-lint.md", "::SPOOL:: <<src/cli.ts#lint>>"],
       ]);
-      const map = buildReferenceMap(docs, "src");
+      const map = buildReferenceMap(docs);
       const errors = verifyUniqueReferences(map);
 
       expect(errors.length).toBe(2);
@@ -147,8 +146,8 @@ describe("verifyUniqueReferences", () => {
 
   describe("when the same passage is referenced twice on the same page", () => {
     test("returns no errors", () => {
-      const docs = new Map([["01-cli.md", "::SPOOL:: <<cli.ts#lint>>\n::SPOOL:: <<cli.ts#lint>>"]]);
-      const map = buildReferenceMap(docs, "src");
+      const docs = new Map([["01-cli.md", "::SPOOL:: <<src/cli.ts#lint>>\n::SPOOL:: <<src/cli.ts#lint>>"]]);
+      const map = buildReferenceMap(docs);
       const errors = verifyUniqueReferences(map);
 
       expect(errors).toEqual([]);
@@ -159,8 +158,8 @@ describe("verifyUniqueReferences", () => {
 describe("buildPassageLocationMap", () => {
   describe("when a passage appears on exactly one page", () => {
     test("includes it in the map with url and anchor", () => {
-      const docs = new Map([["02-lint.md", "::SPOOL:: <<cli.ts#lint>>"]]);
-      const refMap = buildReferenceMap(docs, "src");
+      const docs = new Map([["02-lint.md", "::SPOOL:: <<src/cli.ts#lint>>"]]);
+      const refMap = buildReferenceMap(docs);
       const locMap = buildPassageLocationMap(refMap);
 
       const info = locMap.get("src/cli.ts:lint");
@@ -174,10 +173,10 @@ describe("buildPassageLocationMap", () => {
   describe("when a passage appears on multiple pages", () => {
     test("excludes it from the map", () => {
       const docs = new Map([
-        ["01-cli.md", "::SPOOL:: <<cli.ts#lint>>"],
-        ["02-lint.md", "::SPOOL:: <<cli.ts#lint>>"],
+        ["01-cli.md", "::SPOOL:: <<src/cli.ts#lint>>"],
+        ["02-lint.md", "::SPOOL:: <<src/cli.ts#lint>>"],
       ]);
-      const refMap = buildReferenceMap(docs, "src");
+      const refMap = buildReferenceMap(docs);
       const locMap = buildPassageLocationMap(refMap);
 
       expect(locMap.has("src/cli.ts:lint")).toBe(false);

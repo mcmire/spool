@@ -14,7 +14,7 @@ describe("lintCommand", () => {
           "src/car.ts",
           ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
         );
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#car>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#car>>");
 
         const stdout = makeWritable();
         const stderr = makeWritable();
@@ -45,14 +45,14 @@ describe("lintCommand", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#missing>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#missing>>");
 
         const stderr = makeWritable();
         await lintCommand({ cwd: root, stdout: makeWritable(), stderr });
 
         expect(stderr.output).toBe(
           "Passage reference errors:\n" +
-            "  docs/guide.md:1:4: Unknown reference: ::SPOOL:: <<car.ts#missing>>\n",
+            "  docs/guide.md:1:4: Unknown reference: ::SPOOL:: <<src/car.ts#missing>>\n",
         );
       }));
 
@@ -60,7 +60,7 @@ describe("lintCommand", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#missing>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#missing>>");
 
         const { exitCode } = await lintCommand({
           cwd: root,
@@ -120,7 +120,7 @@ describe("lintCommand", () => {
           "src/broken.ts",
           ["// ::SPOOL:: start(#car)", "class Car {}"].join("\n"),
         );
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#missing>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#missing>>");
 
         const stderr = makeWritable();
         await lintCommand({ cwd: root, stdout: makeWritable(), stderr });
@@ -129,7 +129,7 @@ describe("lintCommand", () => {
           "Source file errors:\n" +
             '  src/broken.ts:1:1: Unclosed passage "car"\n' +
             "Passage reference errors:\n" +
-            "  docs/guide.md:1:4: Unknown reference: ::SPOOL:: <<car.ts#missing>>\n",
+            "  docs/guide.md:1:4: Unknown reference: ::SPOOL:: <<src/car.ts#missing>>\n",
         );
       }));
   });

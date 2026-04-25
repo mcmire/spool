@@ -13,7 +13,7 @@ describe("lintProject", () => {
           "src/car.ts",
           ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
         );
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#car>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#car>>");
 
         const { registryErrors, docErrors } = await lintProject(root, makeConfig());
 
@@ -26,7 +26,7 @@ describe("lintProject", () => {
     test("reports a doc error for that file", () =>
       withTempDir(async (root) => {
         await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#missing>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#missing>>");
 
         const { docErrors } = await lintProject(root, makeConfig());
 
@@ -40,8 +40,8 @@ describe("lintProject", () => {
     test("reports doc errors for each file independently", () =>
       withTempDir(async (root) => {
         await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/a.md", "// ::SPOOL:: <<car.ts#missing-a>>");
-        await createFile(root, "docs/b.md", "// ::SPOOL:: <<car.ts#missing-b>>");
+        await createFile(root, "docs/a.md", "// ::SPOOL:: <<src/car.ts#missing-a>>");
+        await createFile(root, "docs/b.md", "// ::SPOOL:: <<src/car.ts#missing-b>>");
 
         const { docErrors } = await lintProject(root, makeConfig());
 
@@ -72,7 +72,7 @@ describe("lintProject", () => {
     test("does not lint them", () =>
       withTempDir(async (root) => {
         await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/notes.txt", "// ::SPOOL:: <<car.ts#missing>>");
+        await createFile(root, "docs/notes.txt", "// ::SPOOL:: <<src/car.ts#missing>>");
 
         const { docErrors } = await lintProject(root, makeConfig());
 
@@ -88,7 +88,7 @@ describe("lintProject", () => {
           "src/car.ts",
           ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
         );
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts@START..start(#car)>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts@START..start(#car)>>");
 
         const { registryErrors, docErrors } = await lintProject(root, makeConfig());
 
@@ -101,7 +101,7 @@ describe("lintProject", () => {
     test("reports a doc error for that file", () =>
       withTempDir(async (root) => {
         await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<missing.ts@START..END>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/missing.ts@START..END>>");
 
         const { docErrors } = await lintProject(root, makeConfig());
 
@@ -119,7 +119,7 @@ describe("lintProject", () => {
           "src/car.ts",
           ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
         );
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts@START..start(#missing)>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts@START..start(#missing)>>");
 
         const { docErrors } = await lintProject(root, makeConfig());
 
@@ -139,7 +139,7 @@ describe("lintProject", () => {
             "\n",
           ),
         );
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.test.ts#car-test>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.test.ts#car-test>>");
 
         const config = makeConfig({ excludeFromCode: ["**/*.test.ts"] });
         const { docErrors } = await lintProject(root, config);

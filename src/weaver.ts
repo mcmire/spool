@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, relative, posix } from "node:path";
+import { dirname, join, relative } from "node:path";
 import fg from "fast-glob";
 import type { ParseError, RangeMarker } from "./parser.ts";
 import { parsePassageReferences, VALID_MODIFIERS } from "./parser.ts";
@@ -61,7 +61,6 @@ export function weaveFile(
   registry: PassageRegistry,
   templateRegistry: PassageTemplateRegistry,
   passagePositions: PassagePositions,
-  sourceDir: string,
 ): { output: string; errors: ParseError[] } {
   const { refs, errors } = parsePassageReferences(docContent);
   const lines = docContent.split("\n");
@@ -76,7 +75,7 @@ export function weaveFile(
       continue;
     }
 
-    const fullPath = posix.join(sourceDir, ref.filePath);
+    const fullPath = ref.filePath;
     const positions = passagePositions.get(fullPath);
     const wholeFileKey = `${fullPath}:`;
     const wholeFileContent = registry.get(wholeFileKey);
@@ -166,7 +165,6 @@ export async function weaveProject(projectRoot: string, config: SpoolConfig): Pr
       registry,
       templateRegistry,
       passagePositions,
-      config.source.code,
     );
 
     if (errors.length > 0) {
@@ -216,7 +214,6 @@ export async function weaveProjectInMemory(
       registry,
       templateRegistry,
       passagePositions,
-      config.source.code,
     );
 
     if (errors.length > 0) {

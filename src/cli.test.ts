@@ -68,7 +68,7 @@ describe("spool weave", () => {
           "src/car.ts",
           ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
         );
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#car>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#car>>");
 
         const { stdout, exitCode } = await runCLI(["weave"], root);
 
@@ -84,7 +84,7 @@ describe("spool weave", () => {
           "src/car.ts",
           ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
         );
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#car>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#car>>");
 
         await runCLI(["weave"], root);
 
@@ -98,7 +98,7 @@ describe("spool weave", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#missing>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#missing>>");
 
         const { stderr, exitCode } = await runCLI(["weave"], root);
 
@@ -153,7 +153,7 @@ describe("spool lint", () => {
           "src/car.ts",
           ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
         );
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#car>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#car>>");
 
         const { stdout, exitCode } = await runCLI(["lint"], root);
 
@@ -167,7 +167,7 @@ describe("spool lint", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<car.ts#missing>>");
+        await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#missing>>");
 
         const { stderr, exitCode } = await runCLI(["lint"], root);
 
@@ -296,7 +296,7 @@ describe("spool lsp", () => {
                 uri: docUri,
                 languageId: "markdown",
                 version: 1,
-                text: "::SPOOL:: <<car.ts#missing>>",
+                text: "::SPOOL:: <<src/car.ts#missing>>",
               },
             },
           });
@@ -366,7 +366,7 @@ describe("spool lsp", () => {
           "src/car.ts",
           ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
         );
-        await createFile(root, "docs/guide.md", "::SPOOL:: <<car.ts#car>>");
+        await createFile(root, "docs/guide.md", "::SPOOL:: <<src/car.ts#car>>");
 
         const realRoot = realpathSync(root);
         const client = await startLspClient(root);
@@ -382,7 +382,7 @@ describe("spool lsp", () => {
                 uri: docUri,
                 languageId: "markdown",
                 version: 1,
-                text: "::SPOOL:: <<car.ts#car>>",
+                text: "::SPOOL:: <<src/car.ts#car>>",
               },
             },
           });
@@ -486,7 +486,7 @@ describe("spool site build", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/guide.md", "::SPOOL:: <<missing.ts#passage>>");
+        await createFile(root, "docs/guide.md", "::SPOOL:: <<src/missing.ts#passage>>");
 
         const { stderr, exitCode } = await runCLI(["site", "build"], root);
 

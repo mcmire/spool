@@ -129,7 +129,7 @@ describe("createServerHandlers", () => {
         const { getDiagnostics } = makeHandlers(root, undefined, registry);
         const diagnostics = getDiagnostics(
           join(root, "docs/guide.md"),
-          "// ::SPOOL:: <<car.ts#car>>",
+          "// ::SPOOL:: <<src/car.ts#car>>",
         );
         expect(diagnostics).toEqual([]);
       });
@@ -140,7 +140,7 @@ describe("createServerHandlers", () => {
         const { getDiagnostics } = makeHandlers(root);
         const diagnostics = getDiagnostics(
           join(root, "docs/guide.md"),
-          "// ::SPOOL:: <<car.ts#missing>>",
+          "// ::SPOOL:: <<src/car.ts#missing>>",
         );
         expect(diagnostics).toHaveLength(1);
         expect(diagnostics[0]!.severity).toBe(DiagnosticSeverity.Error);
