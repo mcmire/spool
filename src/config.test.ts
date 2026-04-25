@@ -101,7 +101,7 @@ describe("loadConfig", () => {
       withTempDir(async (root) => {
         await writeConfig(root, { target: "out" });
 
-        expect(loadConfig(root)).rejects.toThrow("Missing or invalid fields in spool.json");
+        await expect(loadConfig(root)).rejects.toThrow("Missing or invalid fields in spool.json");
       }));
   });
 
@@ -110,7 +110,7 @@ describe("loadConfig", () => {
       withTempDir(async (root) => {
         await writeConfig(root, { source: { code: "src" }, target: "out" });
 
-        expect(loadConfig(root)).rejects.toThrow("Missing or invalid fields in spool.json");
+        await expect(loadConfig(root)).rejects.toThrow("Missing or invalid fields in spool.json");
       }));
   });
 
@@ -119,7 +119,7 @@ describe("loadConfig", () => {
       withTempDir(async (root) => {
         await writeConfig(root, { source: { code: "src", docs: "docs" } });
 
-        expect(loadConfig(root)).rejects.toThrow("Missing or invalid fields in spool.json");
+        await expect(loadConfig(root)).rejects.toThrow("Missing or invalid fields in spool.json");
       }));
   });
 
@@ -128,7 +128,9 @@ describe("loadConfig", () => {
       withTempDir(async (root) => {
         await writeConfig(root, { source: { docs: "docs" }, target: "out" });
 
-        expect(loadConfig(root)).rejects.toThrow('Missing or invalid "source.code" in spool.json');
+        await expect(loadConfig(root)).rejects.toThrow(
+          'Missing or invalid "source.code" in spool.json',
+        );
       }));
   });
 
@@ -137,7 +139,9 @@ describe("loadConfig", () => {
       withTempDir(async (root) => {
         await writeConfig(root, { source: { code: [], docs: "docs" }, target: "out" });
 
-        expect(loadConfig(root)).rejects.toThrow('Missing or invalid "source.code" in spool.json');
+        await expect(loadConfig(root)).rejects.toThrow(
+          'Missing or invalid "source.code" in spool.json',
+        );
       }));
   });
 
@@ -146,14 +150,14 @@ describe("loadConfig", () => {
       withTempDir(async (root) => {
         await writeFile(join(root, "spool.json"), "{ not valid json", "utf-8");
 
-        expect(loadConfig(root)).rejects.toThrow();
+        await expect(loadConfig(root)).rejects.toThrow();
       }));
   });
 
   describe("when the config file does not exist", () => {
     test("throws an error", () =>
       withTempDir(async (root) => {
-        expect(loadConfig(root)).rejects.toThrow();
+        await expect(loadConfig(root)).rejects.toThrow();
       }));
   });
 });
