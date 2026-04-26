@@ -133,4 +133,98 @@ describe("lintCommand", () => {
         );
       }));
   });
+
+  describe("--coverage", () => {
+    describe("when a source file has no markers", () => {
+      test("writes the unmarked source files section to stderr", () =>
+        withTempDir(async (root) => {
+          await writeConfig(root);
+          await createFile(root, "src/utils.ts", "export function noop() {}");
+          await createFile(root, "docs/guide.md", "# Guide");
+
+          const stderr = makeWritable();
+          await lintCommand({ cwd: root, stdout: makeWritable(), stderr, coverage: true });
+
+          expect(stderr.output).toBe("Unmarked source files:\n  src/utils.ts\n");
+        }));
+
+      test("returns exitCode 1", () =>
+        withTempDir(async (root) => {
+          await writeConfig(root);
+          await createFile(root, "src/utils.ts", "export function noop() {}");
+          await createFile(root, "docs/guide.md", "# Guide");
+
+          const { exitCode } = await lintCommand({
+            cwd: root,
+            stdout: makeWritable(),
+            stderr: makeWritable(),
+            coverage: true,
+          });
+
+          expect(exitCode).toBe(1);
+        }));
+    });
+
+    describe("when a passage is not referenced in any doc", () => {
+      test("writes the unreferenced passages section to stderr", () =>
+        withTempDir(async (root) => {
+          await writeConfig(root);
+          await createFile(
+            root,
+            "src/car.ts",
+            ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
+          );
+          await createFile(root, "docs/guide.md", "# Guide");
+
+          const stderr = makeWritable();
+          await lintCommand({ cwd: root, stdout: makeWritable(), stderr, coverage: true });
+
+          expect(stderr.output).toBe("Unreferenced passages:\n  src/car.ts#car\n");
+        }));
+
+      test("returns exitCode 1", () =>
+        withTempDir(async (root) => {
+          await writeConfig(root);
+          await createFile(
+            root,
+            "src/car.ts",
+            ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
+          );
+          await createFile(root, "docs/guide.md", "# Guide");
+
+          const { exitCode } = await lintCommand({
+            cwd: root,
+            stdout: makeWritable(),
+            stderr: makeWritable(),
+            coverage: true,
+          });
+
+          expect(exitCode).toBe(1);
+        }));
+    });
+
+    describe("when all files are marked and all passages are referenced", () => {
+      test("writes a success message and returns no exitCode", () =>
+        withTempDir(async (root) => {
+          await writeConfig(root);
+          await createFile(
+            root,
+            "src/car.ts",
+            ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
+          );
+          await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#car>>");
+
+          const stdout = makeWritable();
+          const { exitCode } = await lintCommand({
+            cwd: root,
+            stdout,
+            stderr: makeWritable(),
+            coverage: true,
+          });
+
+          expect(stdout.output).toBe("No errors found.\n");
+          expect(exitCode).toBeUndefined();
+        }));
+    });
+  });
 });

@@ -9,10 +9,16 @@ import type { FileErrors, PassagePositions } from "../../registries.ts";
 export type LintResult = {
   registryErrors: FileErrors[];
   docErrors: FileErrors[];
+  unmarkedFiles?: string[];
+  unreferencedPassages?: Array<{ filePath: string; passageName: string }>;
 };
 
 // == ::SPOOL:: start(#lintProject) ==
-export async function lintProject(projectRoot: string, config: SpoolConfig): Promise<LintResult> {
+export async function lintProject(
+  projectRoot: string,
+  config: SpoolConfig,
+  options: { coverage?: boolean } = {},
+): Promise<LintResult> {
   const {
     registry,
     passagePositions,
@@ -21,6 +27,7 @@ export async function lintProject(projectRoot: string, config: SpoolConfig): Pro
 
   const docErrors: FileErrors[] = [];
   const docsDir = join(projectRoot, config.source.docs);
+  const referencedPassageKeys = new Set<string>();
 
   const entries = await fg("**/*.md", { cwd: docsDir });
   for (const entry of entries) {
@@ -65,6 +72,8 @@ export async function lintProject(projectRoot: string, config: SpoolConfig): Pro
           column: ref.column,
           message: `Unknown reference: ${ref.raw}`,
         });
+      } else if (options.coverage && ref.passageName) {
+        referencedPassageKeys.add(key);
       }
     }
 
@@ -74,6 +83,44 @@ export async function lintProject(projectRoot: string, config: SpoolConfig): Pro
     }
   }
 
-  return { registryErrors, docErrors };
+  if (!options.coverage) {
+    return { registryErrors, docErrors };
+  }
+
+  const filesWithPassages = new Set<string>();
+  const allNamedPassageKeys: string[] = [];
+  for (const key of registry.keys()) {
+    const colonIdx = key.indexOf(":");
+    const passageName = key.slice(colonIdx + 1);
+    if (passageName !== "") {
+      const filePath = key.slice(0, colonIdx);
+      filesWithPassages.add(filePath);
+      allNamedPassageKeys.push(key);
+    }
+  }
+
+  const unmarkedFiles: string[] = [];
+  for (const relPath of passagePositions.keys()) {
+    if (!filesWithPassages.has(relPath)) {
+      unmarkedFiles.push(relPath);
+    }
+  }
+  unmarkedFiles.sort();
+
+  const unreferencedPassages: Array<{ filePath: string; passageName: string }> = [];
+  for (const key of allNamedPassageKeys) {
+    if (!referencedPassageKeys.has(key)) {
+      const colonIdx = key.indexOf(":");
+      unreferencedPassages.push({
+        filePath: key.slice(0, colonIdx),
+        passageName: key.slice(colonIdx + 1),
+      });
+    }
+  }
+  unreferencedPassages.sort(
+    (a, b) => a.filePath.localeCompare(b.filePath) || a.passageName.localeCompare(b.passageName),
+  );
+
+  return { registryErrors, docErrors, unmarkedFiles, unreferencedPassages };
 }
 // == ::SPOOL:: end(#lintProject) ==

@@ -8,6 +8,7 @@ export type LintCommandOptions = {
   cwd: string;
   stdout: Writable;
   stderr: Writable;
+  coverage?: boolean;
 };
 
 export type LintCommandResult = {
@@ -27,12 +28,21 @@ export async function lintCommand({
   cwd,
   stdout,
   stderr,
+  coverage,
 }: LintCommandOptions): Promise<LintCommandResult> {
   const projectRoot = findProjectRoot(cwd);
   const config = await loadConfig(projectRoot);
-  const { registryErrors, docErrors } = await lintProject(projectRoot, config);
+  const { registryErrors, docErrors, unmarkedFiles, unreferencedPassages } = await lintProject(
+    projectRoot,
+    config,
+    { coverage },
+  );
 
-  const hasErrors = registryErrors.length > 0 || docErrors.length > 0;
+  const hasErrors =
+    registryErrors.length > 0 ||
+    docErrors.length > 0 ||
+    (unmarkedFiles && unmarkedFiles.length > 0) ||
+    (unreferencedPassages && unreferencedPassages.length > 0);
 
   if (registryErrors.length > 0) {
     stderr.write("Source file errors:\n");
@@ -42,6 +52,20 @@ export async function lintCommand({
   if (docErrors.length > 0) {
     stderr.write("Passage reference errors:\n");
     printErrors(docErrors, stderr);
+  }
+
+  if (unmarkedFiles && unmarkedFiles.length > 0) {
+    stderr.write("Unmarked source files:\n");
+    for (const f of unmarkedFiles) {
+      stderr.write(`  ${f}\n`);
+    }
+  }
+
+  if (unreferencedPassages && unreferencedPassages.length > 0) {
+    stderr.write("Unreferenced passages:\n");
+    for (const { filePath, passageName } of unreferencedPassages) {
+      stderr.write(`  ${filePath}#${passageName}\n`);
+    }
   }
 
   if (hasErrors) {

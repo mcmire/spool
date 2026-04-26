@@ -148,4 +148,86 @@ describe("lintProject", () => {
         expect(docErrors[0]!.errors[0]!.message).toContain("Unknown reference");
       }));
   });
+
+  describe("coverage mode", () => {
+    describe("when all files are marked and all passages are referenced", () => {
+      test("returns empty unmarkedFiles and unreferencedPassages", () =>
+        withTempDir(async (root) => {
+          await createFile(
+            root,
+            "src/car.ts",
+            ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
+          );
+          await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts#car>>");
+
+          const { unmarkedFiles, unreferencedPassages } = await lintProject(root, makeConfig(), {
+            coverage: true,
+          });
+
+          expect(unmarkedFiles).toEqual([]);
+          expect(unreferencedPassages).toEqual([]);
+        }));
+    });
+
+    describe("when a source file has no markers", () => {
+      test("includes it in unmarkedFiles", () =>
+        withTempDir(async (root) => {
+          await createFile(root, "src/utils.ts", "export function noop() {}");
+          await createFile(root, "docs/guide.md", "# Guide");
+
+          const { unmarkedFiles } = await lintProject(root, makeConfig(), { coverage: true });
+
+          expect(unmarkedFiles).toEqual(["src/utils.ts"]);
+        }));
+    });
+
+    describe("when a passage is defined but not referenced in any doc", () => {
+      test("includes it in unreferencedPassages", () =>
+        withTempDir(async (root) => {
+          await createFile(
+            root,
+            "src/car.ts",
+            ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
+          );
+          await createFile(root, "docs/guide.md", "# Guide");
+
+          const { unreferencedPassages } = await lintProject(root, makeConfig(), {
+            coverage: true,
+          });
+
+          expect(unreferencedPassages).toEqual([{ filePath: "src/car.ts", passageName: "car" }]);
+        }));
+    });
+
+    describe("when a passage is only referenced via a range ref", () => {
+      test("still considers the passage unreferenced", () =>
+        withTempDir(async (root) => {
+          await createFile(
+            root,
+            "src/car.ts",
+            ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
+          );
+          await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts@START..end(#car)>>");
+
+          const { unreferencedPassages } = await lintProject(root, makeConfig(), {
+            coverage: true,
+          });
+
+          expect(unreferencedPassages).toEqual([{ filePath: "src/car.ts", passageName: "car" }]);
+        }));
+    });
+
+    describe("when coverage is not enabled", () => {
+      test("does not return unmarkedFiles or unreferencedPassages", () =>
+        withTempDir(async (root) => {
+          await createFile(root, "src/utils.ts", "export function noop() {}");
+          await createFile(root, "docs/guide.md", "# Guide");
+
+          const result = await lintProject(root, makeConfig());
+
+          expect(result.unmarkedFiles).toBeUndefined();
+          expect(result.unreferencedPassages).toBeUndefined();
+        }));
+    });
+  });
 });

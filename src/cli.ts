@@ -32,12 +32,14 @@ program
 program
   .command("lint")
   .description("Check for errors in source annotations and passage references")
-  .action(async () => {
+  .option("--coverage", "Also check that all source files are marked and all passages are documented")
+  .action(async (options: { coverage?: boolean }) => {
     const { lintCommand } = await import("./commands/lint/command.ts");
     const result = await lintCommand({
       cwd: process.cwd(),
       stdout: process.stdout,
       stderr: process.stderr,
+      coverage: options.coverage,
     });
     if (result.exitCode !== undefined) {
       process.exitCode = result.exitCode;
