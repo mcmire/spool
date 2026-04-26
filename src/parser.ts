@@ -34,14 +34,17 @@ type Frame = { name: string; lines: string[]; nestedRefs: NestedRef[] };
 
 export const VALID_MODIFIERS = new Set(["no-expand-nested"]);
 
+// ::SPOOL:: ignore-start
 const SOURCE_ANNOTATION_RE = /^(.*?)(?:==\s*)?::SPOOL::\s+(start|end)\(#([\w-]+)\)(?:\s*==)?\s*$/;
 const SOURCE_DIRECTIVE_RE = /^.*?::SPOOL::\s+(\S+)/;
 const SOURCE_IGNORE_RE = /^.*?::SPOOL::\s+(ignore-start|ignore-end|ignore-next)\s*$/;
 const PASSAGE_REFERENCE_RE = /^(.*?)::SPOOL::\s+<<(.+?)(?:#([\w-]+))?(?::([\w-]+))?>>/;
 const PASSAGE_RANGE_RE =
   /^(.*?)::SPOOL::\s+<<(.+?)@((?:START|END|start\(#[\w-]+\)|end\(#[\w-]+\)))\.\.((?:START|END|start\(#[\w-]+\)|end\(#[\w-]+\)))>>/;
+// ::SPOOL:: ignore-end
 
 function magicCommentError(line: string, lineNum: number): ParseError {
+  // ::SPOOL:: ignore-next
   const col = line.indexOf("::SPOOL::") + 1;
   const directiveMatch = SOURCE_DIRECTIVE_RE.exec(line);
 
@@ -49,12 +52,15 @@ function magicCommentError(line: string, lineNum: number): ParseError {
     return {
       line: lineNum,
       column: col,
+      // ::SPOOL:: ignore-next
       length: "::SPOOL::".length,
+      // ::SPOOL:: ignore-next
       message: "Expected '::SPOOL:: start(#name)' or '::SPOOL:: end(#name)'",
     };
   }
 
   const directive = directiveMatch[1]!;
+  // ::SPOOL:: ignore-next
   const directiveLength = directiveMatch[0]!.length - directiveMatch[0]!.indexOf("::SPOOL::");
 
   if (
@@ -77,6 +83,7 @@ function magicCommentError(line: string, lineNum: number): ParseError {
       line: lineNum,
       column: col,
       length: directiveLength,
+      // ::SPOOL:: ignore-next
       message: `Unclosed parenthesis. Expected '::SPOOL:: ${verb}(#name)'`,
     };
   }
@@ -190,6 +197,7 @@ export function parseSourcePassages(content: string): {
         }
         stack.push({ name: passageName, lines: [], nestedRefs: [] });
       }
+      // ::SPOOL:: ignore-next
     } else if (line.includes("::SPOOL::")) {
       errors.push(magicCommentError(line, i + 1));
     } else {
@@ -221,14 +229,17 @@ export function parseSourcePassages(content: string): {
 }
 
 function malformedReferenceError(line: string, lineNum: number): ParseError {
+  // ::SPOOL:: ignore-next
   const col = line.indexOf("::SPOOL::") + 1;
   const closeIdx = line.indexOf(">>", col - 1);
+  // ::SPOOL:: ignore-next
   const length = closeIdx >= 0 ? closeIdx + 2 - (col - 1) : "::SPOOL::".length;
   return {
     line: lineNum,
     column: col,
     length,
     message:
+      // ::SPOOL:: ignore-next
       "Expected reference to match '::SPOOL:: <<file>>', '::SPOOL:: <<file#passage>>', or '::SPOOL:: <<file@start..end>>'",
   };
 }
@@ -273,6 +284,7 @@ export function parsePassageReferences(content: string): {
       } catch {
         errors.push({
           line: i + 1,
+          // ::SPOOL:: ignore-next
           column: line.indexOf("::SPOOL::") + 1,
           message: "Invalid range marker",
         });
@@ -283,7 +295,9 @@ export function parsePassageReferences(content: string): {
         passageName: undefined,
         modifier: undefined,
         line: i + 1,
+        // ::SPOOL:: ignore-next
         column: rangeMatch[0]!.indexOf("::SPOOL::") + 1,
+        // ::SPOOL:: ignore-next
         raw: `::SPOOL:: <<${rangeMatch[2]!}@${rangeStartStr}..${rangeEndStr}>>`,
         isRange: true,
         rangeStart,
@@ -301,12 +315,16 @@ export function parsePassageReferences(content: string): {
       const modifier = match[4];
       let raw: string;
       if (passageName !== undefined && modifier !== undefined) {
+        // ::SPOOL:: ignore-next
         raw = `::SPOOL:: <<${match[2]!}#${passageName}:${modifier}>>`;
       } else if (passageName !== undefined) {
+        // ::SPOOL:: ignore-next
         raw = `::SPOOL:: <<${match[2]!}#${passageName}>>`;
       } else if (modifier !== undefined) {
+        // ::SPOOL:: ignore-next
         raw = `::SPOOL:: <<${match[2]!}:${modifier}>>`;
       } else {
+        // ::SPOOL:: ignore-next
         raw = `::SPOOL:: <<${match[2]!}>>`;
       }
       refs.push({
@@ -314,10 +332,12 @@ export function parsePassageReferences(content: string): {
         passageName,
         modifier,
         line: i + 1,
+        // ::SPOOL:: ignore-next
         column: match[0]!.indexOf("::SPOOL::") + 1,
         raw,
         isRange: false,
       });
+      // ::SPOOL:: ignore-next
     } else if (line.includes("::SPOOL::")) {
       errors.push(malformedReferenceError(line, i + 1));
     }

@@ -11,11 +11,13 @@ export type LintResult = {
   docErrors: FileErrors[];
 };
 
+// == ::SPOOL:: start(#lintProject) ==
 export async function lintProject(projectRoot: string, config: SpoolConfig): Promise<LintResult> {
-  const { registry, passagePositions, errors: registryErrors } = await buildRegistries(
-    projectRoot,
-    config,
-  );
+  const {
+    registry,
+    passagePositions,
+    errors: registryErrors,
+  } = await buildRegistries(projectRoot, config);
 
   const docErrors: FileErrors[] = [];
   const docsDir = join(projectRoot, config.source.docs);
@@ -74,3 +76,4 @@ export async function lintProject(projectRoot: string, config: SpoolConfig): Pro
 
   return { registryErrors, docErrors };
 }
+// == ::SPOOL:: end(#lintProject) ==

@@ -69,6 +69,7 @@ function wrapPassage(content: string, filePath: string, anchorId: string | undef
   return `<SpoolPassage${anchorAttr}>\n\n\`\`\`${lang}\n${content}\n\`\`\`\n\n</SpoolPassage>`;
 }
 
+// ::SPOOL:: ignore-next
 // When a passage reference is written inside a doc code fence (e.g. ```ts\n// ::SPOOL:: ...\n```),
 // the outer fence delimiters are redundant once we wrap the content in <SpoolPassage>. This
 // function blanks out those delimiter lines so they don't appear in the rendered output.

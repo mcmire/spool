@@ -8,6 +8,7 @@ program
   .name("spool")
   .description("Reverse literate programming — weave annotated source into docs");
 
+// == ::SPOOL:: start(#weave) ==
 program
   .command("weave")
   .description("Weave source annotations into documentation files")
@@ -25,7 +26,9 @@ program
       process.exitCode = result.exitCode;
     }
   });
+// == ::SPOOL:: end(#weave) ==
 
+// == ::SPOOL:: start(#lint) ==
 program
   .command("lint")
   .description("Check for errors in source annotations and passage references")
@@ -40,7 +43,9 @@ program
       process.exitCode = result.exitCode;
     }
   });
+// == ::SPOOL:: end(#lint) ==
 
+// == ::SPOOL:: start(#site) ==
 const site = program
   .command("site")
   .description("Build and serve a documentation site from woven output")
@@ -50,6 +55,7 @@ const site = program
     "Link unexpanded passage references to the page where they are expanded (implies --verify-unique-references)",
   );
 
+// == ::SPOOL:: start(#site-dev) ==
 site
   .command("dev")
   .description("Start a development server with live reloading")
@@ -84,7 +90,9 @@ site
       setTimeout(() => process.exit(0), 3000).unref();
     });
   });
+// == ::SPOOL:: end(#site-dev) ==
 
+// == ::SPOOL:: start(#site-build) ==
 site
   .command("build")
   .description("Build the documentation site for production")
@@ -105,7 +113,10 @@ site
       process.exitCode = result.exitCode;
     }
   });
+// == ::SPOOL:: end(#site-build) ==
+// == ::SPOOL:: end(#site) ==
 
+// == ::SPOOL:: start(#lsp) ==
 program
   .command("lsp")
   .description("Start the Language Server Protocol server")
@@ -113,5 +124,6 @@ program
     const { lspCommand } = await import("./commands/lsp/command.ts");
     lspCommand();
   });
+// == ::SPOOL:: end(#lsp) ==
 
 program.parse();

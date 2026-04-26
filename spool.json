@@ -1,0 +1,7 @@
+{
+  "source": {
+    "code": ["src", "!**/*.test.ts"],
+    "docs": "docs"
+  },
+  "target": "dist/docs"
+}

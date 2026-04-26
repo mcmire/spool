@@ -22,6 +22,7 @@ function printErrors(fileErrors: FileErrors[], stderr: Writable): void {
   }
 }
 
+// == ::SPOOL:: start(#lintCommand) ==
 export async function lintCommand({
   cwd,
   stdout,
@@ -50,3 +51,4 @@ export async function lintCommand({
   stdout.write("No errors found.\n");
   return {};
 }
+// == ::SPOOL:: end(#lintCommand) ==

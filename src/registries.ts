@@ -24,6 +24,7 @@ function buildTemplateContent(lines: string[], nestedRefs: NestedRef[], relPath:
   let i = 0;
   for (const nested of nestedRefs) {
     result.push(...lines.slice(i, nested.startIdx));
+    // ::SPOOL:: ignore-next
     result.push(`${nested.prefix}::SPOOL:: <<${relPath}#${nested.name}>>`);
     i = nested.endIdx;
   }

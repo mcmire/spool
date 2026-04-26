@@ -73,6 +73,7 @@ export async function writeVitePressConfig(
     lines.push("const spoolLinkTransformer = {");
     lines.push("  postprocess(html) {");
     lines.push(
+      // ::SPOOL:: ignore-next
       "    return html.replace(/::SPOOL:: (?:&lt;|&#x3C;)(?:&lt;|&#x3C;)(.+?)(?:#([\\w-]+))?(?:&gt;|>)(?:&gt;|>)/g, (match, file, passage) => {",
     );
     lines.push("      const key = passage ? file + ':' + passage : file + ':';");
