@@ -11,13 +11,13 @@ The annotation syntax is language-agnostic — it works with any comment style (
 **1. Annotate your source code:**
 
 ```ts
-// == @SPOOL(start): #car ==
+// ::SPOOL:: start(#car)
 export class Car {
   drive() {
     console.log("vroom");
   }
 }
-// == @SPOOL(end): #car ==
+// ::SPOOL:: end(#car)
 ```
 
 **2. Reference passages in your doc templates:**
@@ -26,13 +26,27 @@ export class Car {
 ## The Car Class
 
 ```ts
-// <<@SPOOL: src/car.ts#car>>
+// ::SPOOL:: <<src/car.ts#car>>
 ```
 ````
 
 **3. Run `spool weave` to produce the final docs.**
 
-Passages are referenced by `<<@SPOOL: relativePath#passageName>>` where the path is relative to the project root. Any comment characters before `<<@SPOOL:` are ignored, so `// <<@SPOOL: ...>>`, `# <<@SPOOL: ...>>`, etc. all work. Passages can be nested — content lines are added to all currently-open passages on the stack.
+Passages are referenced by `::SPOOL:: <<relativePath#passageName>>` where the path is relative to the project root. Any comment characters before `::SPOOL::` are ignored, so `// ::SPOOL:: ...`, `# ::SPOOL:: ...`, etc. all work. Passages can be nested — content lines are added to all currently-open passages on the stack.
+
+To include an entire file without a named passage, omit the `#passageName` part:
+
+```md
+// ::SPOOL:: <<src/car.ts>>
+```
+
+To include a range of lines between two passage markers:
+
+```md
+// ::SPOOL:: <<src/car.ts@START..end(#car)>>
+```
+
+`START` and `END` refer to the beginning and end of the file; `start(#name)` and `end(#name)` refer to named passage boundaries.
 
 ## Setup
 
@@ -40,19 +54,33 @@ Create a `spool.json` at your project root:
 
 ```json
 {
-  "sourceCodeDir": "src",
-  "sourceDocsDir": "docs",
-  "targetDocsDir": "output"
+  "source": {
+    "code": "src",
+    "docs": "docs"
+  },
+  "target": "output"
 }
 ```
 
-| Field           | Description                                  |
-| --------------- | -------------------------------------------- |
-| `sourceCodeDir` | Directory scanned for annotated source files |
-| `sourceDocsDir` | Directory containing `.md` doc templates     |
-| `targetDocsDir` | Directory where woven output is written      |
+| Field         | Description                                  |
+| ------------- | -------------------------------------------- |
+| `source.code` | Directory scanned for annotated source files |
+| `source.docs` | Directory containing `.md` doc templates     |
+| `target`      | Directory where woven output is written      |
 
-`sourceDocsDir` may be inside `sourceCodeDir` — spool skips it when scanning for annotations.
+`source.docs` may be inside `source.code` — spool skips it when scanning for annotations.
+
+To exclude files from the source scan, use an array for `source.code` with `!`-prefixed glob patterns:
+
+```json
+{
+  "source": {
+    "code": ["src", "!**/*.test.ts"],
+    "docs": "docs"
+  },
+  "target": "dist/docs"
+}
+```
 
 ## Usage
 
@@ -62,13 +90,18 @@ spool <command> [options]
 
 ### `spool weave`
 
-Builds the block registry from source annotations and weaves all `.md` templates in `sourceDocsDir` into `targetDocsDir`, preserving directory structure.
+Builds the passage registry from source annotations and weaves all `.md` templates in `source.docs` into `target`, preserving directory structure.
 
 ```sh
 spool weave
 ```
 
-Exits with code 1 if any errors are found (unclosed blocks, unknown references, etc.).
+| Option            | Description                                        |
+| ----------------- | -------------------------------------------------- |
+| `-w, --watch`     | Watch for changes and re-weave automatically       |
+| `-c, --clean`     | Clear the target directory before weaving          |
+
+Exits with code 1 if any errors are found (unclosed passages, unknown references, etc.).
 
 ### `spool lint`
 
@@ -78,27 +111,43 @@ Validates source annotations and doc references without writing any output files
 spool lint
 ```
 
+| Option        | Description                                                                    |
+| ------------- | ------------------------------------------------------------------------------ |
+| `--coverage`  | Also check that every source file has at least one passage and every passage is referenced in a doc |
+
 Exits with code 1 if any errors are found.
 
-### `spool preview`
+### `spool site dev`
 
-Runs an initial weave, then starts a local HTTP server that renders `.md` files as HTML. Watches `sourceCodeDir` and `sourceDocsDir` for changes and re-weaves automatically.
+Runs an initial weave, then starts a VitePress development server with live reloading.
 
 ```sh
-spool preview
-spool preview --port 8080
+spool site dev
+spool site dev --port 8080
 ```
 
-| Option              | Default | Description                 |
-| ------------------- | ------- | --------------------------- |
-| `-p, --port <port>` | `4567`  | Port for the preview server |
+| Option                          | Default  | Description                                                                                      |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `-p, --port <port>`             | `5173`   | Port for the dev server                                                                          |
+| `--verify-unique-references`    |          | Error if any passage is referenced on multiple pages                                             |
+| `--link-references`             |          | Link unexpanded passage references to the page where they are expanded (implies `--verify-unique-references`) |
+
+### `spool site build`
+
+Builds the documentation site for production.
+
+```sh
+spool site build
+```
+
+Accepts the same `--verify-unique-references` and `--link-references` flags as `spool site dev`.
 
 ### `spool lsp`
 
 Starts the Language Server Protocol server over stdio. Provides inline diagnostics for:
 
-- **Source files**: malformed annotations (unclosed blocks, mismatched close tags, duplicate names)
-- **Doc files**: references to blocks that don't exist in the registry
+- **Source files**: malformed annotations (unclosed passages, mismatched close tags, duplicate names)
+- **Doc files**: references to passages that don't exist in the registry
 
 ```sh
 spool lsp
