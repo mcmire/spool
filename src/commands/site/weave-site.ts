@@ -241,7 +241,7 @@ export async function weaveSiteFiles(
       weaveErrors.push({ filePath: relPath, errors });
     }
 
-    files.set(entry, output);
+    files.set(entry.replace(/(^|\/)README\.md$/, "$1index.md"), output);
   }
 
   return {
