@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import * as path from "node:path";
 
 const program = new Command();
 
 program
   .name("spool")
-  .description("Reverse literate programming — weave annotated source into docs");
+  .description("Reverse literate programming — weave annotated source into docs")
+  .option("--project <dir>", "Directory containing spool.json (defaults to current directory)");
 
 // == ::SPOOL:: start(#weave) ==
 program
@@ -16,8 +18,9 @@ program
   .option("-c, --clean", "Clear the target directory before weaving")
   .action(async (options: { watch?: boolean; clean?: boolean }) => {
     const { weaveCommand } = await import("./commands/weave/command.ts");
+    const cwd = path.resolve(program.opts().project ?? process.cwd());
     const result = await weaveCommand({
-      cwd: process.cwd(),
+      cwd,
       stdout: process.stdout,
       stderr: process.stderr,
       ...options,
@@ -32,11 +35,15 @@ program
 program
   .command("lint")
   .description("Check for errors in source annotations and passage references")
-  .option("--coverage", "Also check that all source files are marked and all passages are documented")
+  .option(
+    "--coverage",
+    "Also check that all source files are marked and all passages are documented",
+  )
   .action(async (options: { coverage?: boolean }) => {
     const { lintCommand } = await import("./commands/lint/command.ts");
+    const cwd = path.resolve(program.opts().project ?? process.cwd());
     const result = await lintCommand({
-      cwd: process.cwd(),
+      cwd,
       stdout: process.stdout,
       stderr: process.stderr,
       coverage: options.coverage,
@@ -68,8 +75,9 @@ site
       linkReferences?: boolean;
     };
     const { siteDevCommand } = await import("./commands/site/command.ts");
+    const cwd = path.resolve(program.opts().project ?? process.cwd());
     const { server } = await siteDevCommand({
-      cwd: process.cwd(),
+      cwd,
       stdout: process.stdout,
       stderr: process.stderr,
       verifyUniqueReferences: parentOpts.verifyUniqueReferences || parentOpts.linkReferences,
@@ -104,8 +112,9 @@ site
       linkReferences?: boolean;
     };
     const { siteBuildCommand } = await import("./commands/site/command.ts");
+    const cwd = path.resolve(program.opts().project ?? process.cwd());
     const result = await siteBuildCommand({
-      cwd: process.cwd(),
+      cwd,
       stdout: process.stdout,
       stderr: process.stderr,
       verifyUniqueReferences: parentOpts.verifyUniqueReferences || parentOpts.linkReferences,
