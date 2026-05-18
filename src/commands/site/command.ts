@@ -5,11 +5,12 @@ import type { FileErrors } from "../../registries.ts";
 import {
   prepareSiteDir,
   writeWovenFiles,
-  writeVitePressConfig,
-  writeVitePressTheme,
+  writeEngineFiles,
+  writeNavData,
+  writeLinkPlugin,
   startDevServer,
   buildSite,
-} from "./vitepress.ts";
+} from "./site-engine.ts";
 import { weaveSiteFiles } from "./weave-site.ts";
 import type { WeaveSiteOptions } from "./weave-site.ts";
 
@@ -65,17 +66,21 @@ export async function siteDevCommand({
 
   await prepareSiteDir(projectRoot);
   await writeWovenFiles(projectRoot, result.files);
-  await writeVitePressConfig(projectRoot, config, {
+  await writeEngineFiles(projectRoot);
+  await writeNavData(projectRoot, config, result.files);
+  await writeLinkPlugin(projectRoot, {
     linkReferences,
     passageLocationMap: result.passageLocationMap,
   });
-  await writeVitePressTheme(projectRoot);
 
   const siteDir = join(projectRoot, ".site");
   const startPort = portOption ? parseInt(portOption, 10) : 5173;
+  stdout.write("Warming up dev server...\n");
+  const warmupStart = Date.now();
   const server = await startDevServer(siteDir, startPort);
+  const elapsed = ((Date.now() - warmupStart) / 1000).toFixed(2);
 
-  stdout.write(`Dev server running at http://localhost:${server.port}\n`);
+  stdout.write(`Dev server running at http://localhost:${server.port} (ready in ${elapsed}s)\n`);
 
   const sourceDir = join(projectRoot, config.source.code);
   const docsDir = join(projectRoot, config.source.docs);
@@ -153,11 +158,12 @@ export async function siteBuildCommand({
 
   await prepareSiteDir(projectRoot);
   await writeWovenFiles(projectRoot, result.files);
-  await writeVitePressConfig(projectRoot, config, {
+  await writeEngineFiles(projectRoot);
+  await writeNavData(projectRoot, config, result.files);
+  await writeLinkPlugin(projectRoot, {
     linkReferences,
     passageLocationMap: result.passageLocationMap,
   });
-  await writeVitePressTheme(projectRoot);
 
   const siteDir = join(projectRoot, ".site");
   await buildSite(siteDir);

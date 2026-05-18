@@ -54,7 +54,7 @@ export function passageAnchorId(refKey: string): string {
 }
 
 export function docPathToUrl(docPath: string): string {
-  return "/" + docPath.replace(/\.md$/, ".html");
+  return "/" + docPath.replace(/\.mdx?$/, "");
 }
 
 /**

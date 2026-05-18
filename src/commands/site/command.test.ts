@@ -17,20 +17,35 @@ vi.mock("node:fs", async (importOriginal) => ({
   watch: mockWatch,
 }));
 
-const mockStop = vi.fn(() => Promise.resolve());
-const mockListen = vi.fn(() => Promise.resolve());
-const mockHttpServer = { address: () => ({ port: 5173 }) };
-const mockDevServer = {
-  listen: mockListen,
-  close: mockStop,
-  httpServer: mockHttpServer,
+// Mock http server so we don't bind to real ports in tests
+const mockHttpServer = {
+  listen: vi.fn((_port: number, cb: () => void) => cb()),
+  address: vi.fn(() => ({ port: 5173 })),
+  close: vi.fn(),
 };
-const mockCreateServer = vi.fn(() => Promise.resolve(mockDevServer));
+
+vi.mock("node:http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:http")>()),
+  createServer: vi.fn(() => mockHttpServer),
+}));
+
+const mockViteServer = {
+  middlewares: vi.fn(),
+  ssrLoadModule: vi.fn(() => Promise.resolve({ Renderer: class { render() { return { status: 200, body: "" }; } } })),
+  close: vi.fn(() => Promise.resolve()),
+};
+const mockCreateViteServer = vi.fn(() => Promise.resolve(mockViteServer));
 const mockBuild = vi.fn(() => Promise.resolve());
 
-vi.mock("vitepress", () => ({
-  createServer: mockCreateServer,
+vi.mock("vite", () => ({
+  createServer: mockCreateViteServer,
   build: mockBuild,
+}));
+
+// Mock child_process so prerender.js subprocess doesn't run in tests
+vi.mock("node:child_process", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:child_process")>()),
+  execFile: vi.fn((_cmd: string, _args: string[], cb: (err: Error | null) => void) => cb(null)),
 }));
 
 const { siteDevCommand, siteBuildCommand } = await import("./command.ts");
@@ -39,9 +54,45 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("writeVitePressConfig", () => {
+describe("writeEngineFiles", () => {
+  describe("when siteDevCommand is called", () => {
+    test("copies SpoolPassage.jsx into .site/engine/", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/index.md", "# Hello");
+
+        await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
+
+        const component = await readFile(
+          join(root, ".site", "engine", "SpoolPassage.jsx"),
+          "utf-8",
+        );
+        expect(component).toContain("spool-passage");
+        expect(component).toContain("anchor");
+      }));
+
+    test("copies vite.config.js into .site/engine/", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/index.md", "# Hello");
+
+        await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
+
+        const config = await readFile(
+          join(root, ".site", "engine", "vite.config.js"),
+          "utf-8",
+        );
+        expect(config).toContain("@mdx-js/rollup");
+        expect(config).toContain("@vitejs/plugin-react");
+      }));
+  });
+});
+
+describe("writeNavData", () => {
   describe("when called with a basic config", () => {
-    test('writes a .site/.vitepress/config.js with srcDir set to "."', () =>
+    test("writes nav-data.js with a default title", () =>
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
@@ -49,30 +100,22 @@ describe("writeVitePressConfig", () => {
 
         await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
 
-        const config = await readFile(join(root, ".site", ".vitepress", "config.js"), "utf-8");
-        expect(config).toContain('"srcDir": "."');
+        const navData = await readFile(
+          join(root, ".site", "engine", "nav-data.js"),
+          "utf-8",
+        );
+        expect(navData).toContain('"title"');
+        expect(navData).toContain('"sidebar"');
       }));
 
-    test("includes default local search in themeConfig", () =>
-      withTempDir(async (root) => {
-        await writeConfig(root);
-        await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/index.md", "# Hello");
-
-        await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
-
-        const config = await readFile(join(root, ".site", ".vitepress", "config.js"), "utf-8");
-        expect(config).toContain('"provider": "local"');
-      }));
-
-    test("merges the site field from spool.json into the VitePress config", () =>
+    test("uses the title from config.site when provided", () =>
       withTempDir(async (root) => {
         await writeFile(
           join(root, "spool.json"),
           JSON.stringify({
             source: { code: "src", docs: "docs" },
             target: "out",
-            site: { title: "My Docs", description: "A test site" },
+            site: { title: "My Docs" },
           }),
           "utf-8",
         );
@@ -81,31 +124,11 @@ describe("writeVitePressConfig", () => {
 
         await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
 
-        const config = await readFile(join(root, ".site", ".vitepress", "config.js"), "utf-8");
-        expect(config).toContain('"title": "My Docs"');
-        expect(config).toContain('"description": "A test site"');
-      }));
-
-    test("does not override themeConfig when provided in site field", () =>
-      withTempDir(async (root) => {
-        await writeFile(
-          join(root, "spool.json"),
-          JSON.stringify({
-            source: { code: "src", docs: "docs" },
-            target: "out",
-            site: { themeConfig: { nav: [{ text: "Home", link: "/" }] } },
-          }),
+        const navData = await readFile(
+          join(root, ".site", "engine", "nav-data.js"),
           "utf-8",
         );
-        await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/index.md", "# Hello");
-
-        await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
-
-        const config = await readFile(join(root, ".site", ".vitepress", "config.js"), "utf-8");
-        expect(config).toContain('"nav"');
-        // Default local search should not be injected since themeConfig is user-supplied
-        expect(config).not.toContain('"provider": "local"');
+        expect(navData).toContain('"My Docs"');
       }));
   });
 });
@@ -133,10 +156,11 @@ describe("siteDevCommand", () => {
         const stdout = makeWritable();
         await siteDevCommand({ cwd: root, stdout, stderr: makeWritable() });
 
-        expect(stdout.output).toContain("Dev server running at http://localhost:");
+        expect(stdout.output).toContain("Warming up dev server...");
+        expect(stdout.output).toMatch(/Dev server running at http:\/\/localhost:\d+ \(ready in \d+\.\d+s\)/);
       }));
 
-    test("calls VitePress createServer with the .site directory", () =>
+    test("calls Vite createServer with the engine config file", () =>
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
@@ -144,13 +168,14 @@ describe("siteDevCommand", () => {
 
         await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
 
-        expect(mockCreateServer).toHaveBeenCalledWith(
-          join(root, ".site"),
-          expect.objectContaining({}),
+        expect(mockCreateViteServer).toHaveBeenCalledWith(
+          expect.objectContaining({
+            configFile: join(root, ".site", "engine", "vite.config.js"),
+          }),
         );
       }));
 
-    test("writes woven files into .site directory", () =>
+    test("writes woven files into .site/pages/ as .mdx files", () =>
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
@@ -158,7 +183,7 @@ describe("siteDevCommand", () => {
 
         await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
 
-        const written = await readFile(join(root, ".site", "guide.md"), "utf-8");
+        const written = await readFile(join(root, ".site", "pages", "guide.mdx"), "utf-8");
         expect(written).toBe("# Guide");
       }));
 
@@ -267,9 +292,6 @@ describe("siteDevCommand", () => {
         expect(vi.getTimerCount()).toBe(1);
 
         await vi.advanceTimersByTimeAsync(200);
-        // The debounced callback runs weaveProject + copyWovenFiles (which uses
-        // fast-glob). These need many event loop ticks to settle, so we switch
-        // to real timers and poll for the expected output.
         vi.useRealTimers();
         const expected = initialOutput + "Re-wove: 1 file(s) written.\n";
         await vi.waitFor(() => {
@@ -305,7 +327,7 @@ describe("siteBuildCommand", () => {
         expect(stdout.output).toContain("Site built successfully.\n");
       }));
 
-    test("calls VitePress build with the .site directory", () =>
+    test("calls Vite build with the server config file", () =>
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
@@ -313,10 +335,14 @@ describe("siteBuildCommand", () => {
 
         await siteBuildCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
 
-        expect(mockBuild).toHaveBeenCalledWith(join(root, ".site"));
+        expect(mockBuild).toHaveBeenCalledWith(
+          expect.objectContaining({
+            configFile: join(root, ".site", "engine", "vite.config.server.js"),
+          }),
+        );
       }));
 
-    test("writes woven files into .site directory", () =>
+    test("writes woven files into .site/pages/ as .mdx files", () =>
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
@@ -324,7 +350,7 @@ describe("siteBuildCommand", () => {
 
         await siteBuildCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
 
-        const written = await readFile(join(root, ".site", "guide.md"), "utf-8");
+        const written = await readFile(join(root, ".site", "pages", "guide.mdx"), "utf-8");
         expect(written).toBe("# Guide");
       }));
 
@@ -349,7 +375,6 @@ describe("siteBuildCommand", () => {
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
-        // Reference a passage that doesn't exist
         await createFile(root, "docs/guide.md", "::SPOOL:: <<src/missing.ts#passage>>");
 
         const result = await siteBuildCommand({
@@ -361,7 +386,7 @@ describe("siteBuildCommand", () => {
         expect(result.exitCode).toBe(1);
       }));
 
-    test("does not call VitePress build when there are errors", () =>
+    test("does not call Vite build when there are errors", () =>
       withTempDir(async (root) => {
         await writeConfig(root);
         await mkdir(join(root, "src"), { recursive: true });
@@ -399,7 +424,7 @@ describe("siteBuildCommand", () => {
   });
 
   describe("when linkReferences is set", () => {
-    test("includes the shiki transformer in the VitePress config", () =>
+    test("writes spool-link-plugin.js with the passage map", () =>
       withTempDir(async (root) => {
         await writeConfig(root);
         await createFile(root, "src/car.ts", "export function drive() {}");
@@ -412,45 +437,12 @@ describe("siteBuildCommand", () => {
           linkReferences: true,
         });
 
-        const config = await readFile(join(root, ".site", ".vitepress", "config.js"), "utf-8");
-        expect(config).toContain("spoolLinkTransformer");
-        expect(config).toContain("passageMap");
-      }));
-  });
-});
-
-describe("writeVitePressTheme", () => {
-  describe("when siteDevCommand is called", () => {
-    test("writes the theme index.ts file", () =>
-      withTempDir(async (root) => {
-        await writeConfig(root);
-        await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/index.md", "# Hello");
-
-        await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
-
-        const themeIndex = await readFile(
-          join(root, ".site", ".vitepress", "theme", "index.ts"),
+        const plugin = await readFile(
+          join(root, ".site", "engine", "spool-link-plugin.js"),
           "utf-8",
         );
-        expect(themeIndex).toContain("SpoolPassage");
-        expect(themeIndex).toContain("DefaultTheme");
-      }));
-
-    test("writes the SpoolPassage.vue component", () =>
-      withTempDir(async (root) => {
-        await writeConfig(root);
-        await mkdir(join(root, "src"), { recursive: true });
-        await createFile(root, "docs/index.md", "# Hello");
-
-        await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
-
-        const component = await readFile(
-          join(root, ".site", ".vitepress", "theme", "SpoolPassage.vue"),
-          "utf-8",
-        );
-        expect(component).toContain("spool-passage");
-        expect(component).toContain("anchor");
+        expect(plugin).toContain("spoolLinkPlugin");
+        expect(plugin).toContain("passageMap");
       }));
   });
 });

@@ -7,7 +7,7 @@
   },
   "type": "module",
   "scripts": {
-    "build": "tsc --project tsconfig.build.json",
+    "build": "tsc --project tsconfig.build.json && cp -r src/commands/site/engine dist/commands/site/engine",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "lint": "tsc --noEmit",
@@ -15,16 +15,26 @@
     "run-tool": "tsx src/cli.ts"
   },
   "dependencies": {
+    "@mdx-js/react": "^3.1.0",
+    "@mdx-js/rollup": "^3.1.0",
+    "@shikijs/rehype": "^3.8.0",
+    "@vitejs/plugin-react": "^4.5.2",
     "commander": "^13.1.0",
     "fast-glob": "^3.3.3",
     "micromatch": "^4.0.8",
-    "vitepress": "^1.6.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "rehype-slug": "^6.0.0",
+    "remark-gfm": "^4.0.1",
+    "vite": "^6.3.5",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12"
   },
   "devDependencies": {
     "@types/micromatch": "^4.0.9",
     "@types/node": "^25.5.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
     "execa": "^9.6.1",
     "oxfmt": "^0.40.0",
     "tsx": "^4.19.3",

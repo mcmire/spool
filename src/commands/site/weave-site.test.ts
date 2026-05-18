@@ -216,7 +216,7 @@ describe("weaveSiteFiles", () => {
 
         expect(result.filesProcessed).toBe(1);
         expect(result.files.size).toBe(1);
-        const content = result.files.get("guide.md")!;
+        const content = result.files.get("guide.mdx")!;
         expect(content).toContain("<SpoolPassage>");
         expect(content).toContain("export function drive() {}");
       }));
@@ -271,7 +271,7 @@ describe("weaveSiteFiles", () => {
           { linkReferences: true },
         );
 
-        const content = result.files.get("guide.md")!;
+        const content = result.files.get("guide.mdx")!;
         expect(content).toContain('anchor="spool-src-car-ts"');
       }));
 
@@ -289,7 +289,7 @@ describe("weaveSiteFiles", () => {
 
         const info = result.passageLocationMap.get("src/car.ts:");
         expect(info).toBeDefined();
-        expect(info!.url).toBe("/guide.html#spool-src-car-ts");
+        expect(info!.url).toBe("/guide#spool-src-car-ts");
       }));
   });
 });

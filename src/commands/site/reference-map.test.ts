@@ -62,15 +62,15 @@ describe("passageAnchorId", () => {
 });
 
 describe("docPathToUrl", () => {
-  describe("when given a simple markdown file", () => {
-    test("replaces .md with .html and prepends /", () => {
-      expect(docPathToUrl("guide.md")).toBe("/guide.html");
+  describe("when given a simple mdx file", () => {
+    test("strips the extension and prepends /", () => {
+      expect(docPathToUrl("guide.mdx")).toBe("/guide");
     });
   });
 
   describe("when given a nested path", () => {
     test("preserves the directory structure", () => {
-      expect(docPathToUrl("guide/intro.md")).toBe("/guide/intro.html");
+      expect(docPathToUrl("guide/intro.mdx")).toBe("/guide/intro");
     });
   });
 });
@@ -166,7 +166,7 @@ describe("buildPassageLocationMap", () => {
       expect(info).toBeDefined();
       expect(info!.docPath).toBe("02-lint.md");
       expect(info!.anchorId).toBe("spool-src-cli-ts-lint");
-      expect(info!.url).toBe("/02-lint.html#spool-src-cli-ts-lint");
+      expect(info!.url).toBe("/02-lint#spool-src-cli-ts-lint");
     });
   });
 
