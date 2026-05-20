@@ -18,7 +18,6 @@ import {
   verifyUniqueReferences,
   buildPassageLocationMap,
   referenceKey,
-  passageAnchorId,
 } from "./reference-map.ts";
 
 const EXTENSION_LANG_MAP: Record<string, string> = {
@@ -65,8 +64,8 @@ export function inferLang(filePath: string): string {
 
 function wrapPassage(content: string, filePath: string, anchorId: string | undefined): string {
   const lang = inferLang(filePath);
-  const anchorAttr = anchorId ? ` anchor="${anchorId}"` : "";
-  return `<SpoolPassage${anchorAttr}>\n\n\`\`\`${lang}\n${content}\n\`\`\`\n\n</SpoolPassage>`;
+  const meta = anchorId ? ` spool-anchor="${anchorId}"` : "";
+  return `\`\`\`${lang}${meta}\n${content}\n\`\`\``;
 }
 
 // ::SPOOL:: ignore-next
@@ -225,7 +224,7 @@ export async function weaveSiteFiles(
     }
   }
 
-  // Weave each doc file with Vue component wrapping
+  // Weave each doc file
   for (const [entry, content] of rawDocContents) {
     filesProcessed++;
     const { output, errors } = weaveSiteFile(
@@ -242,7 +241,7 @@ export async function weaveSiteFiles(
     }
 
     files.set(
-      entry.replace(/\.md$/, ".mdx").replace(/(^|\/)README\.mdx$/, "$1index.mdx"),
+      entry.replace(/(^|\/)README\.md$/, "$1index.md"),
       output,
     );
   }

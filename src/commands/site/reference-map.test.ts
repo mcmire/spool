@@ -73,6 +73,13 @@ describe("docPathToUrl", () => {
       expect(docPathToUrl("guide/intro.mdx")).toBe("/guide/intro");
     });
   });
+
+  describe("when given an index file", () => {
+    test("strips the index segment", () => {
+      expect(docPathToUrl("guide/index.md")).toBe("/guide");
+      expect(docPathToUrl("index.md")).toBe("/");
+    });
+  });
 });
 
 describe("buildReferenceMap", () => {

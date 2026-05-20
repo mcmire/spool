@@ -450,7 +450,7 @@ describe("spool site dev", () => {
             while (!serverLine.startsWith("Dev server running at")) {
               serverLine = await readLine();
             }
-            expect(serverLine).toMatch(/^Dev server running at http:\/\/localhost:\d+$/);
+            expect(serverLine).toMatch(/^Dev server running at http:\/\/localhost:\d+/);
           } finally {
             kill();
             await new Promise((resolve) => proc.on("close", resolve));

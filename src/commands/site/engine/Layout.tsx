@@ -1,10 +1,14 @@
-import navData from "./nav-data.js";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
-function NavItems({ items }) {
+type NavItem = { text: string; url: string } | { text: string; items: NavItem[] };
+export type NavData = { title: string; sidebar: NavItem[] };
+
+function NavItems({ items }: { items: NavItem[] }) {
   return (
     <ul>
       {items.map((item, i) =>
-        item.items ? (
+        "items" in item ? (
           <li key={i} className="spool-nav-group">
             <span className="spool-nav-group-title">{item.text}</span>
             <NavItems items={item.items} />
@@ -19,20 +23,21 @@ function NavItems({ items }) {
   );
 }
 
-export function Layout({ meta, children }) {
-  const pageTitle = meta?.title
-    ? `${meta.title} | ${navData.title}`
-    : navData.title;
-
+function Layout({
+  contentHtml,
+  pageTitle,
+  navData,
+}: {
+  contentHtml: string;
+  pageTitle: string;
+  navData: NavData;
+}) {
   return (
     <html lang="en">
       <head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{pageTitle}</title>
-        {meta?.description && (
-          <meta name="description" content={meta.description} />
-        )}
         <link rel="stylesheet" href="/spool-site.css" />
       </head>
       <body>
@@ -45,10 +50,27 @@ export function Layout({ meta, children }) {
               <NavItems items={navData.sidebar} />
             </nav>
           </aside>
-          <main className="spool-content">{children}</main>
+          <main
+            className="spool-content"
+            dangerouslySetInnerHTML={{ __html: contentHtml }}
+          />
         </div>
-        <script src="/spool-highlight.js" />
+        <div id="spool-root" />
+        <script src="/spool-client.js" />
       </body>
     </html>
+  );
+}
+
+export function renderLayout(
+  contentHtml: string,
+  pageTitle: string,
+  navData: NavData,
+): string {
+  return (
+    "<!DOCTYPE html>" +
+    renderToStaticMarkup(
+      <Layout contentHtml={contentHtml} pageTitle={pageTitle} navData={navData} />,
+    )
   );
 }

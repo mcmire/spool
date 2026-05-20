@@ -4,10 +4,8 @@ import { findProjectRoot, loadConfig } from "../../config.ts";
 import type { FileErrors } from "../../registries.ts";
 import {
   prepareSiteDir,
-  writeWovenFiles,
-  writeEngineFiles,
-  writeNavData,
-  writeLinkPlugin,
+  buildNavData,
+  writeHtmlPages,
   startDevServer,
   buildSite,
 } from "./site-engine.ts";
@@ -64,16 +62,17 @@ export async function siteDevCommand({
   const result = await weaveSiteFiles(projectRoot, config, weaveOptions);
   stdout.write(`Initial weave: ${result.files.size} file(s) written.\n`);
 
-  await prepareSiteDir(projectRoot);
-  await writeWovenFiles(projectRoot, result.files);
-  await writeEngineFiles(projectRoot);
-  await writeNavData(projectRoot, config, result.files);
-  await writeLinkPlugin(projectRoot, {
-    linkReferences,
-    passageLocationMap: result.passageLocationMap,
-  });
-
   const siteDir = join(projectRoot, ".site");
+  await prepareSiteDir(projectRoot);
+
+  const navData = buildNavData(config, result.files);
+  await writeHtmlPages(
+    siteDir,
+    result.files,
+    navData,
+    linkReferences ? result.passageLocationMap : undefined,
+  );
+
   const startPort = portOption ? parseInt(portOption, 10) : 5173;
   stdout.write("Warming up dev server...\n");
   const warmupStart = Date.now();
@@ -88,13 +87,18 @@ export async function siteDevCommand({
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   function scheduleReweave(): void {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-    }
+    if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
       try {
         const r = await weaveSiteFiles(projectRoot, config, weaveOptions);
-        await writeWovenFiles(projectRoot, r.files);
+        const nd = buildNavData(config, r.files);
+        await writeHtmlPages(
+          siteDir,
+          r.files,
+          nd,
+          linkReferences ? r.passageLocationMap : undefined,
+        );
+        server.reload();
         stdout.write(`Re-wove: ${r.files.size} file(s) written.\n`);
       } catch (err) {
         stderr.write(`Re-weave failed: ${err}\n`);
@@ -103,16 +107,12 @@ export async function siteDevCommand({
   }
 
   watch(sourceDir, { recursive: true }, (_event, filename) => {
-    if (filename) {
-      scheduleReweave();
-    }
+    if (filename) scheduleReweave();
   });
 
   if (!docsDir.startsWith(sourceDir)) {
     watch(docsDir, { recursive: true }, (_event, filename) => {
-      if (filename) {
-        scheduleReweave();
-      }
+      if (filename) scheduleReweave();
     });
   }
 
@@ -157,16 +157,12 @@ export async function siteBuildCommand({
   }
 
   await prepareSiteDir(projectRoot);
-  await writeWovenFiles(projectRoot, result.files);
-  await writeEngineFiles(projectRoot);
-  await writeNavData(projectRoot, config, result.files);
-  await writeLinkPlugin(projectRoot, {
-    linkReferences,
-    passageLocationMap: result.passageLocationMap,
-  });
-
-  const siteDir = join(projectRoot, ".site");
-  await buildSite(siteDir);
+  await buildSite(
+    projectRoot,
+    result.files,
+    config,
+    linkReferences ? result.passageLocationMap : undefined,
+  );
 
   stdout.write("Site built successfully.\n");
   return {};

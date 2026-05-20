@@ -52,7 +52,7 @@ describe("inferLang", () => {
 
 describe("weaveSiteFile", () => {
   describe("when the doc contains a passage reference", () => {
-    test("wraps the passage in a SpoolPassage component with a code fence", () => {
+    test("wraps the passage in a code fence", () => {
       const { registry, templateRegistry, passagePositions } = makeRegistries({
         "src/car.ts:drive": { registry: "export function drive() {}" },
       });
@@ -66,14 +66,12 @@ describe("weaveSiteFile", () => {
       );
 
       expect(errors).toEqual([]);
-      expect(output).toBe(
-        "<SpoolPassage>\n\n```ts\nexport function drive() {}\n```\n\n</SpoolPassage>",
-      );
+      expect(output).toBe("```ts\nexport function drive() {}\n```");
     });
   });
 
   describe("when a passage location map is provided", () => {
-    test("includes the anchor attribute on the SpoolPassage component", () => {
+    test("includes the spool-anchor attribute on the code fence meta", () => {
       const { registry, templateRegistry, passagePositions } = makeRegistries({
         "src/car.ts:drive": { registry: "export function drive() {}" },
       });
@@ -98,7 +96,7 @@ describe("weaveSiteFile", () => {
       );
 
       expect(errors).toEqual([]);
-      expect(output).toContain('anchor="spool-src-car-ts-drive"');
+      expect(output).toContain('spool-anchor="spool-src-car-ts-drive"');
     });
   });
 
@@ -174,10 +172,9 @@ describe("weaveSiteFile", () => {
       );
 
       expect(errors).toEqual([]);
-      // The outer doc fences should be gone; the inner fence inside the component is fine
-      expect(output).not.toMatch(/^```ts\s*$\n.*<SpoolPassage>/ms);
-      expect(output).not.toMatch(/<\/SpoolPassage>\n```\s*$/ms);
-      expect(output).toContain("<SpoolPassage>");
+      // The outer doc fences should be gone; only the inner fence from wrapPassage remains
+      expect(output).not.toMatch(/^```ts\s*$\n.*```ts/ms);
+      expect(output).not.toMatch(/```\n```\s*$/ms);
       expect(output).toContain("```ts\nexport function drive() {}");
     });
   });
@@ -196,14 +193,14 @@ describe("weaveSiteFile", () => {
         undefined,
       );
 
-      expect(output).toMatch(/^# Guide\n\nHere is the code:\n\n<SpoolPassage>/);
+      expect(output).toMatch(/^# Guide\n\nHere is the code:\n\n```ts\n/);
     });
   });
 });
 
 describe("weaveSiteFiles", () => {
   describe("when called with a simple project", () => {
-    test("returns woven files with SpoolPassage wrappers", () =>
+    test("returns woven files with code fence wrappers", () =>
       withTempDir(async (root) => {
         await writeConfig(root);
         await createFile(root, "src/car.ts", "export function drive() {}");
@@ -216,8 +213,8 @@ describe("weaveSiteFiles", () => {
 
         expect(result.filesProcessed).toBe(1);
         expect(result.files.size).toBe(1);
-        const content = result.files.get("guide.mdx")!;
-        expect(content).toContain("<SpoolPassage>");
+        const content = result.files.get("guide.md")!;
+        expect(content).toContain("```ts");
         expect(content).toContain("export function drive() {}");
       }));
   });
@@ -259,7 +256,7 @@ describe("weaveSiteFiles", () => {
   });
 
   describe("when linkReferences is set", () => {
-    test("includes anchor attributes in SpoolPassage wrappers", () =>
+    test("includes spool-anchor attributes in code fence meta", () =>
       withTempDir(async (root) => {
         await writeConfig(root);
         await createFile(root, "src/car.ts", "export function drive() {}");
@@ -271,8 +268,8 @@ describe("weaveSiteFiles", () => {
           { linkReferences: true },
         );
 
-        const content = result.files.get("guide.mdx")!;
-        expect(content).toContain('anchor="spool-src-car-ts"');
+        const content = result.files.get("guide.md")!;
+        expect(content).toContain('spool-anchor="spool-src-car-ts"');
       }));
 
     test("returns the passage location map", () =>

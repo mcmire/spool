@@ -54,7 +54,10 @@ export function passageAnchorId(refKey: string): string {
 }
 
 export function docPathToUrl(docPath: string): string {
-  return "/" + docPath.replace(/\.mdx?$/, "");
+  const withoutExt = docPath.replace(/\.mdx?$/, "");
+  const withoutIndex = withoutExt.replace(/(^|\/)index$/, "$1");
+  const trimmed = withoutIndex.replace(/\/$/, "");
+  return "/" + trimmed;
 }
 
 /**
