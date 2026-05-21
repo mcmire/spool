@@ -2,6 +2,11 @@
 import { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 
+declare const mermaid: {
+  initialize(config: Record<string, unknown>): void;
+  run(): Promise<void>;
+};
+
 function SpoolEffects() {
   useEffect(() => {
     function highlight() {
@@ -17,6 +22,11 @@ function SpoolEffects() {
     highlight();
     window.addEventListener("hashchange", highlight);
     return () => window.removeEventListener("hashchange", highlight);
+  }, []);
+
+  useEffect(() => {
+    mermaid.initialize({ startOnLoad: false });
+    void mermaid.run();
   }, []);
 
   return null;

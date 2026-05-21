@@ -1,6 +1,9 @@
 import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { basename, dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+const MERMAID_DIST = createRequire(import.meta.url).resolve("mermaid/dist/mermaid.min.js");
 
 import type { SpoolConfig } from "../../config.ts";
 import type { PassageLocationMap } from "./reference-map.ts";
@@ -40,6 +43,7 @@ async function buildClientBundle(outputDir: string): Promise<void> {
 export async function prepareSiteDir(projectRoot: string): Promise<void> {
   const siteDir = join(projectRoot, ".site");
   await mkdir(siteDir, { recursive: true });
+  await copyFile(MERMAID_DIST, join(siteDir, "spool-mermaid.js"));
   await buildClientBundle(siteDir);
 }
 
@@ -176,5 +180,6 @@ export async function buildSite(
   await writeHtmlPages(distDir, files, navData, passageLocationMap);
 
   await copyFile(join(ENGINE_SRC_DIR, "spool-site.css"), join(distDir, "spool-site.css"));
+  await copyFile(MERMAID_DIST, join(distDir, "spool-mermaid.js"));
   await buildClientBundle(distDir);
 }

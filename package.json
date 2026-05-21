@@ -18,6 +18,7 @@
     "@shikijs/rehype": "^3.8.0",
     "commander": "^13.1.0",
     "fast-glob": "^3.3.3",
+    "mermaid": "^11.15.0",
     "micromatch": "^4.0.8",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

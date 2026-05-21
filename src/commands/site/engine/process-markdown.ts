@@ -9,6 +9,31 @@ import rehypeStringify from "rehype-stringify";
 import { visit } from "unist-util-visit";
 import type { PassageLocationMap } from "../reference-map.ts";
 
+// Converts ```mermaid code blocks into <pre class="mermaid"> before Shiki runs,
+// so Mermaid.js can render them client-side.
+function mermaidPlugin() {
+  return (tree: Parameters<typeof visit>[0]) => {
+    visit(tree, "element", (node: any, index: any, parent: any) => {
+      if (node.tagName !== "pre" || !Array.isArray(node.children)) return;
+      const code = node.children.find((c: any) => c.tagName === "code");
+      if (!code) return;
+      const classes: string[] = code.properties?.className ?? [];
+      if (!classes.includes("language-mermaid")) return;
+      if (!parent || index == null) return;
+      const text = (code.children as any[])
+        .filter((c) => c.type === "text")
+        .map((c) => c.value)
+        .join("");
+      parent.children[index] = {
+        type: "element",
+        tagName: "pre",
+        properties: { className: ["mermaid"] },
+        children: [{ type: "text", value: text }],
+      };
+    });
+  };
+}
+
 // Wraps <pre> elements whose <code> child carries a spool-anchor meta attribute
 // in a <div class="spool-passage" id="..."> for hash-based highlighting.
 function spoolPassageWrapper() {
@@ -86,6 +111,7 @@ export async function processMarkdown(
   }
 
   p.use(remarkRehype, { allowDangerousHtml: true })
+    .use(mermaidPlugin)
     .use(spoolPassageWrapper)
     .use(rehypeShiki, { theme: "github-dark" })
     .use(rehypeSlug)

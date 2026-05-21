@@ -56,6 +56,7 @@ function Layout({
           />
         </div>
         <div id="spool-root" />
+        <script src="/spool-mermaid.js" />
         <script src="/spool-client.js" />
       </body>
     </html>
