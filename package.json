@@ -12,7 +12,7 @@
     "fmt:check": "oxfmt --check",
     "lint": "tsgo --noEmit",
     "test": "vitest run",
-    "run-tool": "node src/cli.ts"
+    "run-tool": "npm run build && node dist/cli.js"
   },
   "dependencies": {
     "@shikijs/rehype": "^3.8.0",
