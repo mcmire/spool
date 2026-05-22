@@ -96,10 +96,10 @@ Builds the passage registry from source annotations and weaves all `.md` templat
 spool weave
 ```
 
-| Option            | Description                                        |
-| ----------------- | -------------------------------------------------- |
-| `-w, --watch`     | Watch for changes and re-weave automatically       |
-| `-c, --clean`     | Clear the target directory before weaving          |
+| Option        | Description                                  |
+| ------------- | -------------------------------------------- |
+| `-w, --watch` | Watch for changes and re-weave automatically |
+| `-c, --clean` | Clear the target directory before weaving    |
 
 Exits with code 1 if any errors are found (unclosed passages, unknown references, etc.).
 
@@ -111,9 +111,9 @@ Validates source annotations and doc references without writing any output files
 spool lint
 ```
 
-| Option        | Description                                                                    |
-| ------------- | ------------------------------------------------------------------------------ |
-| `--coverage`  | Also check that every source file has at least one passage and every passage is referenced in a doc |
+| Option       | Description                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------------- |
+| `--coverage` | Also check that every source file has at least one passage and every passage is referenced in a doc |
 
 Exits with code 1 if any errors are found.
 
@@ -126,11 +126,11 @@ spool site dev
 spool site dev --port 8080
 ```
 
-| Option                          | Default  | Description                                                                                      |
-| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `-p, --port <port>`             | `5173`   | Port for the dev server                                                                          |
-| `--verify-unique-references`    |          | Error if any passage is referenced on multiple pages                                             |
-| `--link-references`             |          | Link unexpanded passage references to the page where they are expanded (implies `--verify-unique-references`) |
+| Option                       | Default | Description                                                                                                   |
+| ---------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `-p, --port <port>`          | `5173`  | Port for the dev server                                                                                       |
+| `--verify-unique-references` |         | Error if any passage is referenced on multiple pages                                                          |
+| `--link-references`          |         | Link unexpanded passage references to the page where they are expanded (implies `--verify-unique-references`) |
 
 ### `spool site build`
 

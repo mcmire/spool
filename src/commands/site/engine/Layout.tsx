@@ -50,10 +50,7 @@ function Layout({
               <NavItems items={navData.sidebar} />
             </nav>
           </aside>
-          <main
-            className="spool-content"
-            dangerouslySetInnerHTML={{ __html: contentHtml }}
-          />
+          <main className="spool-content" dangerouslySetInnerHTML={{ __html: contentHtml }} />
         </div>
         <div id="spool-root" />
         <script src="/spool-mermaid.js" />
@@ -63,11 +60,7 @@ function Layout({
   );
 }
 
-export function renderLayout(
-  contentHtml: string,
-  pageTitle: string,
-  navData: NavData,
-): string {
+export function renderLayout(contentHtml: string, pageTitle: string, navData: NavData): string {
   return (
     "<!DOCTYPE html>" +
     renderToStaticMarkup(

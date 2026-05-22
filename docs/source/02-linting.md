@@ -17,4 +17,3 @@ Now we can define a `lint` command in the CLI:
 ```ts
 // ::SPOOL:: <<src/cli.ts#lint>>
 ```
-

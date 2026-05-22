@@ -63,12 +63,7 @@ describe("weaveFile", () => {
         "// ::SPOOL:: <<src/boat.ts#boat>>",
       ].join("\n");
 
-      const { output, errors } = weaveFile(
-        doc,
-        registry,
-        templateRegistry,
-        passagePositions,
-      );
+      const { output, errors } = weaveFile(doc, registry, templateRegistry, passagePositions);
 
       expect(errors).toEqual([]);
       expect(output).toBe(["## Car", "class Car {}", "## Boat", "class Boat {}"].join("\n"));
@@ -138,12 +133,7 @@ describe("weaveFile", () => {
       const { registry, templateRegistry, passagePositions } = makeRegistries({});
 
       const refLine = "// ::SPOOL:: <<src/car.ts#car>>";
-      const { output, errors } = weaveFile(
-        refLine,
-        registry,
-        templateRegistry,
-        passagePositions,
-      );
+      const { output, errors } = weaveFile(refLine, registry, templateRegistry, passagePositions);
 
       expect(errors).toHaveLength(1);
       expect(errors[0]!.message).toContain("Unknown reference");
@@ -158,12 +148,7 @@ describe("weaveFile", () => {
       });
 
       const refLine = "// ::SPOOL:: <<src/car.ts#car:bad-modifier>>";
-      const { output, errors } = weaveFile(
-        refLine,
-        registry,
-        templateRegistry,
-        passagePositions,
-      );
+      const { output, errors } = weaveFile(refLine, registry, templateRegistry, passagePositions);
 
       expect(errors).toHaveLength(1);
       expect(errors[0]!.message).toContain("Unknown modifier");
@@ -176,12 +161,7 @@ describe("weaveFile", () => {
       const { registry, templateRegistry, passagePositions } = makeRegistries({});
       const doc = "# Hello\n\nJust a plain markdown file.\n";
 
-      const { output, errors } = weaveFile(
-        doc,
-        registry,
-        templateRegistry,
-        passagePositions,
-      );
+      const { output, errors } = weaveFile(doc, registry, templateRegistry, passagePositions);
 
       expect(errors).toEqual([]);
       expect(output).toBe(doc);
@@ -236,12 +216,7 @@ describe("weaveFile", () => {
       const { registry, templateRegistry, passagePositions } = makeRegistries({});
 
       const refLine = "// ::SPOOL:: <<src/missing.ts@START..END>>";
-      const { output, errors } = weaveFile(
-        refLine,
-        registry,
-        templateRegistry,
-        passagePositions,
-      );
+      const { output, errors } = weaveFile(refLine, registry, templateRegistry, passagePositions);
 
       expect(errors).toHaveLength(1);
       expect(errors[0]!.message).toContain("Unknown reference");
@@ -258,12 +233,7 @@ describe("weaveFile", () => {
       });
 
       const refLine = "// ::SPOOL:: <<src/cli.ts@START..start(#missing)>>";
-      const { output, errors } = weaveFile(
-        refLine,
-        registry,
-        templateRegistry,
-        passagePositions,
-      );
+      const { output, errors } = weaveFile(refLine, registry, templateRegistry, passagePositions);
 
       expect(errors).toHaveLength(1);
       expect(errors[0]!.message).toContain("Unknown passage in range");
@@ -275,12 +245,7 @@ describe("weaveFile", () => {
     test("reports a parse error", () => {
       const { registry, templateRegistry, passagePositions } = makeRegistries({});
 
-      const { errors } = weaveFile(
-        "// ::SPOOL::",
-        registry,
-        templateRegistry,
-        passagePositions,
-      );
+      const { errors } = weaveFile("// ::SPOOL::", registry, templateRegistry, passagePositions);
 
       expect(errors).toHaveLength(1);
     });

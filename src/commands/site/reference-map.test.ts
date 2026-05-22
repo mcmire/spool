@@ -153,7 +153,9 @@ describe("verifyUniqueReferences", () => {
 
   describe("when the same passage is referenced twice on the same page", () => {
     test("returns no errors", () => {
-      const docs = new Map([["01-cli.md", "::SPOOL:: <<src/cli.ts#lint>>\n::SPOOL:: <<src/cli.ts#lint>>"]]);
+      const docs = new Map([
+        ["01-cli.md", "::SPOOL:: <<src/cli.ts#lint>>\n::SPOOL:: <<src/cli.ts#lint>>"],
+      ]);
       const map = buildReferenceMap(docs);
       const errors = verifyUniqueReferences(map);
 

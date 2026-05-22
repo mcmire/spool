@@ -73,7 +73,9 @@ describe("siteDevCommand", () => {
         await siteDevCommand({ cwd: root, stdout, stderr: makeWritable() });
 
         expect(stdout.output).toContain("Warming up dev server...");
-        expect(stdout.output).toMatch(/Dev server running at http:\/\/localhost:\d+ \(ready in \d+\.\d+s\)/);
+        expect(stdout.output).toMatch(
+          /Dev server running at http:\/\/localhost:\d+ \(ready in \d+\.\d+s\)/,
+        );
       }));
 
     test("calls Vite createServer with mpa appType and no config file", () =>
@@ -273,10 +275,7 @@ describe("siteBuildCommand", () => {
 
         await siteBuildCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
 
-        const html = await readFile(
-          join(root, ".site", "dist", "static", "guide.html"),
-          "utf-8",
-        );
+        const html = await readFile(join(root, ".site", "dist", "static", "guide.html"), "utf-8");
         expect(html).toContain("<!DOCTYPE html>");
         expect(html).toContain("<title>Guide</title>");
       }));

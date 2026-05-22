@@ -32,7 +32,7 @@ npm run build
 
 This project uses **Node.js** (not Bun).
 
-- Run TypeScript files with `tsx <file>` or via `npm run run-tool`
+- Run TypeScript files with `node <file>` or via `npm run run-tool`
 - Use `npm install` / `npm install --save-dev` for packages
 - Use `node:fs`, `node:path`, `node:readline`, etc. (always with the `node:` prefix)
 - Use `execa` for spawning subprocesses in tests

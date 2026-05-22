@@ -160,12 +160,7 @@ export async function weaveProject(projectRoot: string, config: SpoolConfig): Pr
     filesProcessed++;
     const fullPath = join(docsDir, entry);
     const content = await readFile(fullPath, "utf-8");
-    const { output, errors } = weaveFile(
-      content,
-      registry,
-      templateRegistry,
-      passagePositions,
-    );
+    const { output, errors } = weaveFile(content, registry, templateRegistry, passagePositions);
 
     if (errors.length > 0) {
       const relPath = relative(projectRoot, fullPath);
@@ -209,12 +204,7 @@ export async function weaveProjectInMemory(
     filesProcessed++;
     const fullPath = join(docsDir, entry);
     const content = await readFile(fullPath, "utf-8");
-    const { output, errors } = weaveFile(
-      content,
-      registry,
-      templateRegistry,
-      passagePositions,
-    );
+    const { output, errors } = weaveFile(content, registry, templateRegistry, passagePositions);
 
     if (errors.length > 0) {
       const relPath = relative(projectRoot, fullPath);

@@ -7,12 +7,12 @@
   },
   "type": "module",
   "scripts": {
-    "build": "tsc --project tsconfig.build.json && cp -r src/commands/site/engine dist/commands/site/engine",
+    "build": "rm -rf dist && tsc --project tsconfig.build.json && cp src/commands/site/engine/client.tsx dist/commands/site/engine/client.tsx && cp src/commands/site/engine/Layout.tsx dist/commands/site/engine/Layout.tsx && cp src/commands/site/engine/spool-site.css dist/commands/site/engine/spool-site.css",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "run-tool": "tsx src/cli.ts"
+    "run-tool": "node src/cli.ts"
   },
   "dependencies": {
     "@shikijs/rehype": "^3.8.0",
@@ -40,7 +40,6 @@
     "@types/react-dom": "^19.2.3",
     "execa": "^9.6.1",
     "oxfmt": "^0.40.0",
-    "tsx": "^4.19.3",
     "vitest": "^3.1.1"
   },
   "peerDependencies": {

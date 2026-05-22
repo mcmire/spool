@@ -58,12 +58,7 @@ export function createServerHandlers(
     if (isSourceFile(filePath)) {
       return getSourceFileDiagnostics(content);
     } else if (isDocFile(filePath)) {
-      return getDocFileDiagnostics(
-        content,
-        registry,
-        templateRegistry,
-        passagePositions,
-      );
+      return getDocFileDiagnostics(content, registry, templateRegistry, passagePositions);
     } else {
       return [];
     }

@@ -7,10 +7,7 @@ import { fileURLToPath } from "node:url";
 import { execa } from "execa";
 import { withTempDir, createFile, writeConfig } from "../tests/helpers.ts";
 
-const CLI = fileURLToPath(new URL("cli.ts", import.meta.url));
-// Resolve tsx from this project's node_modules so it's found regardless of CWD.
-// --import requires a file: URL (not a bare path) when the specifier is absolute.
-const TSX_ESM = new URL("../node_modules/tsx/dist/esm/index.mjs", import.meta.url).href;
+const CLI = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 
 type SpawnResult = {
   stdout: string;
@@ -23,7 +20,7 @@ async function runCLI(
   cwd: string,
   opts: { timeout?: number } = {},
 ): Promise<SpawnResult> {
-  const result = await execa("node", ["--import", TSX_ESM, CLI, ...args], {
+  const result = await execa("node", [CLI, ...args], {
     cwd,
     stdin: "ignore",
     reject: false,
@@ -41,7 +38,7 @@ async function spawnCLI(
   readLine(): Promise<string>;
   kill(): void;
 }> {
-  const proc = execa("node", ["--import", TSX_ESM, CLI, ...args], {
+  const proc = execa("node", [CLI, ...args], {
     cwd,
     stdin: "ignore",
   });
@@ -194,7 +191,7 @@ describe("spool lsp", () => {
     readNotification(method: string): Promise<JsonRpcMessage>;
     kill(): void;
   }> {
-    const proc = execa("node", ["--import", TSX_ESM, CLI, "lsp"], { cwd: root });
+    const proc = execa("node", [CLI, "lsp"], { cwd: root });
     proc.catch(() => {}); // suppress unhandled rejection on kill
 
     const decoder = new TextDecoder("utf-8");

@@ -161,9 +161,7 @@ export function getDocFileDiagnostics(
     }
 
     const key =
-      ref.passageName !== undefined
-        ? `${ref.filePath}:${ref.passageName}`
-        : `${ref.filePath}:`;
+      ref.passageName !== undefined ? `${ref.filePath}:${ref.passageName}` : `${ref.filePath}:`;
     const source = ref.modifier === "no-expand-nested" ? templateRegistry : registry;
     if (!source.has(key)) {
       const message =

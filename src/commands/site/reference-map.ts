@@ -64,20 +64,13 @@ export function docPathToUrl(docPath: string): string {
  * Scans all doc files for passage references and builds a map of
  * reference key -> list of doc pages that use it.
  */
-export function buildReferenceMap(
-  docContents: Map<string, string>,
-): ReferenceMap {
+export function buildReferenceMap(docContents: Map<string, string>): ReferenceMap {
   const map: ReferenceMap = new Map();
 
   for (const [docPath, content] of docContents) {
     const { refs } = parsePassageReferences(content);
     for (const ref of refs) {
-      const key = referenceKey(
-        ref.filePath,
-        ref.passageName,
-        ref.rangeStart,
-        ref.rangeEnd,
-      );
+      const key = referenceKey(ref.filePath, ref.passageName, ref.rangeStart, ref.rangeEnd);
       let locations = map.get(key);
       if (!locations) {
         locations = [];

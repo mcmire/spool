@@ -1,4 +1,6 @@
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -120,13 +122,26 @@ body {
   font-weight: 600;
 }
 
-.spool-content h1 { font-size: 2rem; margin-top: 0; }
-.spool-content h2 { font-size: 1.5rem; border-bottom: 1px solid var(--color-border); padding-bottom: 0.25rem; }
-.spool-content h3 { font-size: 1.2rem; }
+.spool-content h1 {
+  font-size: 2rem;
+  margin-top: 0;
+}
+.spool-content h2 {
+  font-size: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.25rem;
+}
+.spool-content h3 {
+  font-size: 1.2rem;
+}
 
-.spool-content p { margin: 0.75rem 0; }
+.spool-content p {
+  margin: 0.75rem 0;
+}
 
-.spool-content a { color: var(--color-link); }
+.spool-content a {
+  color: var(--color-link);
+}
 
 .spool-content code {
   font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
@@ -164,7 +179,8 @@ body {
 }
 
 @keyframes spool-highlight {
-  0%, 50% {
+  0%,
+  50% {
     background-color: rgba(255, 220, 50, 0.25);
   }
   100% {

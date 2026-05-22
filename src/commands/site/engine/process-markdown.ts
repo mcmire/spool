@@ -60,37 +60,35 @@ function spoolPassageWrapper() {
 // so that links work regardless of whether the page URL has a trailing slash.
 function resolveRelativeLinks(fileRelPath: string) {
   const dir = posix.dirname(fileRelPath); // e.g. "source" for "source/index.md"
-  return () =>
-    (tree: Parameters<typeof visit>[0]) => {
-      visit(tree, "link", (node: any) => {
-        const url = node.url as string;
-        if (!url || /^(https?:|mailto:|#|\/)/.test(url)) return;
-        const [path, fragment] = url.split("#") as [string, string | undefined];
-        const resolved = posix.join(dir, path).replace(/\.md$/, "");
-        node.url = fragment ? "/" + resolved + "#" + fragment : "/" + resolved;
-      });
-    };
+  return () => (tree: Parameters<typeof visit>[0]) => {
+    visit(tree, "link", (node: any) => {
+      const url = node.url as string;
+      if (!url || /^(https?:|mailto:|#|\/)/.test(url)) return;
+      const [path, fragment] = url.split("#") as [string, string | undefined];
+      const resolved = posix.join(dir, path).replace(/\.md$/, "");
+      node.url = fragment ? "/" + resolved + "#" + fragment : "/" + resolved;
+    });
+  };
 }
 
 // Transforms ::SPOOL:: <<file#passage>> text nodes into links using the passage location map.
 function spoolLinkPlugin(map: PassageLocationMap) {
-  return () =>
-    (tree: Parameters<typeof visit>[0]) => {
-      visit(tree, "text", (node: any, index: any, parent: any) => {
-        // ::SPOOL:: ignore-next
-        const m = /::SPOOL:: <<(.+?)(?:#([\w-]+))?>>/.exec(node.value);
-        if (!m || !parent || index == null) return;
-        const key = m[2] ? `${m[1]}:${m[2]}` : `${m[1]}:`;
-        const info = map.get(key);
-        if (!info) return;
-        const label = m[2] ? `${m[1]}#${m[2]}` : m[1];
-        parent.children.splice(index, 1, {
-          type: "link",
-          url: info.url,
-          children: [{ type: "text", value: label }],
-        });
+  return () => (tree: Parameters<typeof visit>[0]) => {
+    visit(tree, "text", (node: any, index: any, parent: any) => {
+      // ::SPOOL:: ignore-next
+      const m = /::SPOOL:: <<(.+?)(?:#([\w-]+))?>>/.exec(node.value);
+      if (!m || !parent || index == null) return;
+      const key = m[2] ? `${m[1]}:${m[2]}` : `${m[1]}:`;
+      const info = map.get(key);
+      if (!info) return;
+      const label = m[2] ? `${m[1]}#${m[2]}` : m[1];
+      parent.children.splice(index, 1, {
+        type: "link",
+        url: info.url,
+        children: [{ type: "text", value: label }],
       });
-    };
+    });
+  };
 }
 
 export async function processMarkdown(
