@@ -1,12 +1,11 @@
 import { watch } from "node:fs";
 import { join, sep } from "node:path";
 import { findProjectRoot, loadConfig } from "../../config.ts";
-import type { SpoolConfig } from "../../config.ts";
 import type { FileErrors } from "../../registries.ts";
-import type { PassageLocationMap } from "./reference-map.ts";
 import {
   prepareSiteDir,
-  writeHtmlPages,
+  prepareSiteDirForDev,
+  renderPageForUrl,
   startDevServer,
   buildSite,
   ENGINE_SRC_DIR,
@@ -16,24 +15,6 @@ import { weaveSiteFiles } from "./weave-site.ts";
 import type { WeaveSiteOptions } from "./weave-site.ts";
 
 type Writable = { write(s: string): void };
-
-/**
- * Describes what types of files changed in the engine directory within a single
- * debounce window. Flags are ORed across all watch events so that a directory-
- * level event fired after a .tsx event does not lose knowledge of the .tsx change.
- */
-type EngineChangeFlags = {
-  /**
-   * True if at least one .tsx or .jsx file changed. Signals that the client
-   * bundle must be rebuilt via prepareSiteDir.
-   */
-  hasTsx: boolean;
-  /**
-   * Basenames of .css files that changed. When this is non-empty and hasTsx is
-   * false the server sends a targeted CSS HMR update instead of a full reload.
-   */
-  cssFiles: string[];
-};
 
 export type SiteDevCommandOptions = {
   cwd: string;
@@ -61,48 +42,10 @@ export type SiteBuildCommandResult = {
 };
 
 /**
- * Handles a batch of file change events in the engine source directory.
- * Pure CSS changes trigger targeted HMR; any React/TS change triggers a fresh
- * SSR re-render and full page reload. When the batch includes a .tsx/.jsx change
- * the client bundle is also rebuilt via prepareSiteDir. Returns the (possibly
- * updated) client bundle version for the caller to persist.
- */
-async function handleEngineChange(
-  flags: EngineChangeFlags,
-  server: DevServer,
-  siteDir: string,
-  latestFiles: Map<string, string>,
-  latestPassageMap: PassageLocationMap | undefined,
-  config: SpoolConfig,
-  projectRoot: string,
-  stdout: Writable,
-  clientBundleVersion: string,
-): Promise<string> {
-  if (!flags.hasTsx && flags.cssFiles.length > 0) {
-    for (const cssFile of flags.cssFiles) {
-      server.sendCssHmr(`/${cssFile}`);
-    }
-    return clientBundleVersion;
-  }
-
-  server.invalidateModuleGraph();
-
-  let nextClientBundleVersion = clientBundleVersion;
-  if (flags.hasTsx) {
-    await prepareSiteDir(projectRoot);
-    nextClientBundleVersion = Date.now().toString();
-  }
-
-  const renderers = await loadEngineRenderers(server);
-  await writeHtmlPages(siteDir, latestFiles, config, latestPassageMap, renderers, nextClientBundleVersion);
-  server.reload();
-  stdout.write(`Engine updated: re-rendered ${latestFiles.size} page(s).\n`);
-  return nextClientBundleVersion;
-}
-
-/**
  * Loads fresh engine renderer functions via Vite's SSR module pipeline so that
  * edits to Layout.tsx or process-markdown.ts take effect without a server restart.
+ * ssrLoadModule returns cached modules unless invalidated by Vite's file watcher,
+ * so calling this on every page request is cheap in steady state.
  */
 async function loadEngineRenderers(server: DevServer): Promise<PageRenderers> {
   const [pmModule, layoutModule] = await Promise.all([
@@ -142,23 +85,29 @@ export async function siteDevCommand({
   stdout.write(`Initial weave: ${result.files.size} file(s) written.\n`);
 
   const siteDir = join(projectRoot, ".site");
-  await prepareSiteDir(projectRoot);
+  await prepareSiteDirForDev(projectRoot);
 
-  let clientBundleVersion = Date.now().toString();
+  let latestFiles = result.files;
+  let latestPassageMap = linkReferences ? result.passageLocationMap : undefined;
 
-  await writeHtmlPages(
-    siteDir,
-    result.files,
-    config,
-    linkReferences ? result.passageLocationMap : undefined,
-    undefined,
-    clientBundleVersion,
-  );
+  // Type assertion: server is assigned by startDevServer below; renderPage only
+  // runs once the server is handling requests, by which point it is non-null.
+  let server: DevServer | null = null;
+
+  const devClientSrc = `/@fs${join(ENGINE_SRC_DIR, "client.tsx")}`;
+
+  async function renderPage(url: string): Promise<string | null> {
+    if (!server) {
+      return null;
+    }
+    const renderers = await loadEngineRenderers(server);
+    return renderPageForUrl(url, latestFiles, config, latestPassageMap, renderers, devClientSrc);
+  }
 
   const startPort = portOption ? parseInt(portOption, 10) : 5173;
   stdout.write("Warming up dev server...\n");
   const warmupStart = Date.now();
-  const server = await startDevServer(siteDir, startPort);
+  server = await startDevServer(siteDir, startPort, renderPage);
   const elapsed = ((Date.now() - warmupStart) / 1000).toFixed(2);
 
   stdout.write(`Dev server running at http://localhost:${server.port} (ready in ${elapsed}s)\n`);
@@ -170,22 +119,18 @@ export async function siteDevCommand({
     ? ENGINE_SRC_DIR.slice(sourceDir.length + sep.length)
     : null;
 
-  let latestFiles = result.files;
-  let latestPassageMap = linkReferences ? result.passageLocationMap : undefined;
-
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let reweaveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   function scheduleReweave(): void {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
+    if (reweaveDebounceTimer) {
+      clearTimeout(reweaveDebounceTimer);
     }
-    debounceTimer = setTimeout(async () => {
+    reweaveDebounceTimer = setTimeout(async () => {
       try {
         const r = await weaveSiteFiles(projectRoot, config, weaveOptions);
         latestFiles = r.files;
         latestPassageMap = linkReferences ? r.passageLocationMap : undefined;
-        await writeHtmlPages(siteDir, r.files, config, latestPassageMap, undefined, clientBundleVersion);
-        server.reload();
+        server?.reload();
         stdout.write(`Re-wove: ${r.files.size} file(s) written.\n`);
       } catch (err) {
         stderr.write(`Re-weave failed: ${err}\n`);
@@ -194,42 +139,43 @@ export async function siteDevCommand({
   }
 
   let engineDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-  let pendingTsxChange = false;
   let pendingCssFiles: string[] = [];
+  let pendingFullReload = false;
 
   watch(ENGINE_SRC_DIR, { recursive: true }, (_event, filename) => {
     if (!filename) {
       return;
     }
+    // Vite's own file watcher handles HMR for .tsx/.jsx because client.tsx is
+    // loaded through Vite's module pipeline. We only need to react to file
+    // types that Vite does not already cover.
     if (filename.endsWith(".tsx") || filename.endsWith(".jsx")) {
-      pendingTsxChange = true;
-    } else if (filename.endsWith(".css")) {
-      pendingCssFiles.push(filename);
+      return;
     }
+    if (filename.endsWith(".css")) {
+      pendingCssFiles.push(filename);
+    } else if (filename.endsWith(".ts") || filename.endsWith(".js")) {
+      pendingFullReload = true;
+    } else {
+      return;
+    }
+
     if (engineDebounceTimer) {
       clearTimeout(engineDebounceTimer);
     }
-    engineDebounceTimer = setTimeout(async () => {
-      const flags: EngineChangeFlags = {
-        hasTsx: pendingTsxChange,
-        cssFiles: pendingCssFiles,
-      };
-      pendingTsxChange = false;
+    engineDebounceTimer = setTimeout(() => {
+      const cssFiles = pendingCssFiles;
+      const fullReload = pendingFullReload;
       pendingCssFiles = [];
-      try {
-        clientBundleVersion = await handleEngineChange(
-          flags,
-          server,
-          siteDir,
-          latestFiles,
-          latestPassageMap,
-          config,
-          projectRoot,
-          stdout,
-          clientBundleVersion,
-        );
-      } catch (err) {
-        stderr.write(`Engine reload failed: ${err}\n`);
+      pendingFullReload = false;
+
+      if (fullReload) {
+        server?.reload();
+        stdout.write("Engine updated: reloaded.\n");
+      } else if (cssFiles.length > 0) {
+        for (const cssFile of cssFiles) {
+          server?.sendCssHmr(`/${cssFile}`);
+        }
       }
     }, 200);
   });

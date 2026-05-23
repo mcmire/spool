@@ -1,14 +1,30 @@
 /// <reference lib="dom" />
+/// <reference types="vite/client" />
 import { useEffect, useState } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
+import type { Root } from "react-dom/client";
 
 import type { NavData } from "./Layout.tsx";
 import { NavItems } from "./Layout.tsx";
+
+/**
+ * React roots reused across HMR updates so that re-running this module after a
+ * Layout.tsx edit re-renders into the SAME root instead of creating a new tree.
+ * Mutated in place; the object lives in import.meta.hot.data which Vite hands
+ * to the next module instance.
+ */
+type Persisted = { navRoot?: Root; effectsRoot?: Root };
 
 declare const mermaid: {
   initialize(config: Record<string, unknown>): void;
   run(): Promise<void>;
 };
+
+const persisted: Persisted = import.meta.hot?.data ?? {};
+
+if (import.meta.hot) {
+  import.meta.hot.accept();
+}
 
 /**
  * Handles client-side visual effects: hash-based passage highlighting and Mermaid rendering.
@@ -47,17 +63,29 @@ function SpoolEffects() {
 
 /**
  * Bootstraps the client-side React tree: hydrates the server-rendered sidebar
- * and mounts client-only effects.
+ * and mounts client-only effects. On HMR re-execution, reuses persisted roots
+ * so updated components render into the existing DOM without remounting.
  */
 function init() {
   const navEl = document.getElementById("spool-sidebar-nav");
   if (navEl) {
     const navData = JSON.parse(navEl.getAttribute("data-nav") ?? "{}") as NavData;
     const currentUrl = navEl.getAttribute("data-current-url") ?? "/";
-    hydrateRoot(navEl, <NavItems items={navData.sidebar} currentUrl={currentUrl} />);
+    const navContent = <NavItems items={navData.sidebar} currentUrl={currentUrl} />;
+    if (persisted.navRoot) {
+      persisted.navRoot.render(navContent);
+    } else {
+      persisted.navRoot = hydrateRoot(navEl, navContent);
+    }
   }
 
-  createRoot(document.getElementById("spool-root")!).render(<SpoolEffects />);
+  const rootEl = document.getElementById("spool-root");
+  if (rootEl) {
+    if (!persisted.effectsRoot) {
+      persisted.effectsRoot = createRoot(rootEl);
+    }
+    persisted.effectsRoot.render(<SpoolEffects />);
+  }
 }
 
 init();

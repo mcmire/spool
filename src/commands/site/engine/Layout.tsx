@@ -88,7 +88,7 @@ export function NavItems({ items, currentUrl }: { items: NavItem[]; currentUrl: 
           return (
             <li key={i}>
               <a href={item.url} className={isActive ? "spool-nav-active" : undefined}>
-                {item.text} hi there
+                {item.text}
               </a>
             </li>
           );
@@ -108,23 +108,19 @@ function Layout({
   pageTitle,
   navData,
   currentUrl,
-  clientBundleVersion,
+  devClientSrc,
 }: {
   contentHtml: string;
   pageTitle: string;
   navData: NavData;
   currentUrl: string;
   /**
-   * Optional cache-busting version string appended to the client bundle URL as
-   * `?v=<version>`. Used by the dev server so the browser always fetches a fresh
-   * copy of spool-client.js after a hot-reload rebuild.
+   * When set, the page loads the client entry as a module script from this URL
+   * instead of the pre-built /spool-client.js bundle. Used by the dev server so
+   * Vite owns the module pipeline and can do HMR on client.tsx and its imports.
    */
-  clientBundleVersion?: string;
+  devClientSrc?: string;
 }) {
-  const clientJsSrc = clientBundleVersion
-    ? `/spool-client.js?v=${clientBundleVersion}`
-    : "/spool-client.js";
-
   return (
     <html lang="en">
       <head>
@@ -148,7 +144,11 @@ function Layout({
         </div>
         <div id="spool-root" />
         <script src="/spool-mermaid.js" />
-        <script src={clientJsSrc} />
+        {devClientSrc ? (
+          <script type="module" src={devClientSrc} />
+        ) : (
+          <script src="/spool-client.js" />
+        )}
       </body>
     </html>
   );
@@ -163,7 +163,7 @@ export function renderLayout(
   pageTitle: string,
   navData: NavData,
   currentUrl: string,
-  clientBundleVersion?: string,
+  devClientSrc?: string,
 ): string {
   return (
     "<!DOCTYPE html>" +
@@ -173,7 +173,7 @@ export function renderLayout(
         pageTitle={pageTitle}
         navData={navData}
         currentUrl={currentUrl}
-        clientBundleVersion={clientBundleVersion}
+        devClientSrc={devClientSrc}
       />,
     )
   );

@@ -51,7 +51,13 @@ export type PageRenderers = {
   /**
    * Wraps content HTML in the full page layout and returns the HTML string.
    */
-  renderLayout(html: string, pageTitle: string, navData: NavData, currentUrl: string, clientBundleVersion?: string): string;
+  renderLayout(
+    html: string,
+    pageTitle: string,
+    navData: NavData,
+    currentUrl: string,
+    devClientSrc?: string,
+  ): string;
 };
 
 async function buildClientBundle(outputDir: string): Promise<void> {
@@ -79,6 +85,17 @@ export async function prepareSiteDir(projectRoot: string): Promise<void> {
   await mkdir(siteDir, { recursive: true });
   await copyFile(MERMAID_DIST, join(siteDir, "spool-mermaid.js"));
   await buildClientBundle(siteDir);
+}
+
+/**
+ * Lighter-weight variant of prepareSiteDir for the dev server: skips the IIFE
+ * client bundle build because the dev server loads client.tsx via Vite's module
+ * pipeline (with HMR) instead of serving a pre-built bundle.
+ */
+export async function prepareSiteDirForDev(projectRoot: string): Promise<void> {
+  const siteDir = join(projectRoot, ".site");
+  await mkdir(siteDir, { recursive: true });
+  await copyFile(MERMAID_DIST, join(siteDir, "spool-mermaid.js"));
 }
 
 function extractTitle(content: string): string | undefined {
@@ -217,7 +234,6 @@ export async function writeHtmlPages(
   config: SpoolConfig,
   passageLocationMap?: PassageLocationMap,
   renderers?: PageRenderers,
-  clientBundleVersion?: string,
 ): Promise<void> {
   const md = renderers?.processMarkdown ?? processMarkdown;
   const render = renderers?.renderLayout ?? renderLayout;
@@ -227,11 +243,53 @@ export async function writeHtmlPages(
     const navData = buildNavDataForUrl(config, files, currentUrl);
     const pageTitle = extractTitle(content) ?? navData.title;
     const html = await md(content, passageLocationMap, relPath);
-    const fullHtml = render(html, pageTitle, navData, currentUrl, clientBundleVersion);
+    const fullHtml = render(html, pageTitle, navData, currentUrl);
     const dest = urlToDest(destDir, currentUrl);
     await mkdir(dirname(dest), { recursive: true });
     await writeFile(dest, fullHtml, "utf-8");
   }
+}
+
+/**
+ * Renders the page HTML for a given request URL using the in-memory weave
+ * results, or returns null if no woven page matches. Used by the dev server
+ * to serve pages without writing them to disk.
+ */
+export async function renderPageForUrl(
+  url: string,
+  files: Map<string, string>,
+  config: SpoolConfig,
+  passageLocationMap: PassageLocationMap | undefined,
+  renderers: PageRenderers,
+  devClientSrc?: string,
+): Promise<string | null> {
+  const targetUrl = normalizeRequestUrl(url);
+
+  for (const [relPath, content] of files) {
+    if (relPathToUrl(relPath) !== targetUrl) {
+      continue;
+    }
+
+    const navData = buildNavDataForUrl(config, files, targetUrl);
+    const pageTitle = extractTitle(content) ?? navData.title;
+    const html = await renderers.processMarkdown(content, passageLocationMap, relPath);
+    return renderers.renderLayout(html, pageTitle, navData, targetUrl, devClientSrc);
+  }
+
+  return null;
+}
+
+/**
+ * Converts a raw request URL (possibly with .html suffix, query string, or
+ * trailing slash) into the canonical URL form produced by relPathToUrl.
+ */
+function normalizeRequestUrl(url: string): string {
+  const pathOnly = url.split(/[?#]/)[0] ?? "/";
+  const withoutHtml = pathOnly.replace(/\/index\.html$/, "/").replace(/\.html$/, "");
+  if (withoutHtml === "" || withoutHtml === "/") {
+    return "/";
+  }
+  return withoutHtml.replace(/\/$/, "");
 }
 
 /**
@@ -267,7 +325,11 @@ export type DevServer = {
   invalidateModuleGraph(): void;
 };
 
-export async function startDevServer(siteDir: string, port: number): Promise<DevServer> {
+export async function startDevServer(
+  siteDir: string,
+  port: number,
+  renderPage: (url: string) => Promise<string | null>,
+): Promise<DevServer> {
   const { createServer } = await import("vite");
 
   const viteServer = await createServer({
@@ -294,6 +356,42 @@ export async function startDevServer(siteDir: string, port: number): Promise<Dev
               }
             }
             next();
+          });
+        },
+      },
+      {
+        name: "spool-in-memory-pages",
+        configureServer(server) {
+          server.middlewares.use(async (req, res, next) => {
+            if (req.method !== "GET" || !req.url) {
+              next();
+              return;
+            }
+
+            const acceptsHtml = (req.headers.accept ?? "").includes("text/html");
+            const looksLikeHtml = req.url === "/" || /\.html(\?|$)/.test(req.url);
+            if (!acceptsHtml && !looksLikeHtml) {
+              next();
+              return;
+            }
+
+            try {
+              const html = await renderPage(req.url);
+              if (html === null) {
+                next();
+                return;
+              }
+
+              const transformed = await server.transformIndexHtml(
+                req.originalUrl ?? req.url,
+                html,
+              );
+              res.statusCode = 200;
+              res.setHeader("Content-Type", "text/html");
+              res.end(transformed);
+            } catch (err) {
+              next(err);
+            }
           });
         },
       },
