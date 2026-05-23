@@ -1,4 +1,5 @@
 import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,12 +14,45 @@ import type { NavItem, NavData } from "./engine/Layout.tsx";
 
 export type { NavData };
 
-// Resolves to src/commands/site/engine/ (or dist/commands/site/engine/ after build).
-const ENGINE_SRC_DIR = join(dirname(fileURLToPath(import.meta.url)), "engine");
-
-// The spool package root, used as Vite's root so it resolves React from spool's
-// own node_modules regardless of the user project's CWD.
+/**
+ * The spool package root. Vite's root is set here so it resolves React from
+ * spool's own node_modules regardless of the user project's CWD.
+ */
 const SPOOL_PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+
+/**
+ * Absolute path to the engine source directory.
+ * When running inside the spool repo (src/ is present), this resolves to
+ * src/commands/site/engine/ so edits to engine files are picked up immediately
+ * by the dev server without rebuilding. When the package is installed (no src/),
+ * it falls back to the compiled dist/commands/site/engine/ copy.
+ * Exported so the dev command can watch it for file changes.
+ */
+export const ENGINE_SRC_DIR = (() => {
+  const srcDir = join(SPOOL_PKG_ROOT, "src", "commands", "site", "engine");
+  const distDir = join(dirname(fileURLToPath(import.meta.url)), "engine");
+  return existsSync(srcDir) ? srcDir : distDir;
+})();
+
+/**
+ * Pluggable render functions for writeHtmlPages.
+ * Used by the dev command to supply hot-reloaded engine modules so page HTML
+ * is regenerated with the latest code without restarting the server.
+ */
+export type PageRenderers = {
+  /**
+   * Converts markdown content to an HTML string.
+   */
+  processMarkdown(
+    content: string,
+    passageLocationMap?: PassageLocationMap,
+    fileRelPath?: string,
+  ): Promise<string>;
+  /**
+   * Wraps content HTML in the full page layout and returns the HTML string.
+   */
+  renderLayout(html: string, pageTitle: string, navData: NavData, currentUrl: string): string;
+};
 
 async function buildClientBundle(outputDir: string): Promise<void> {
   const { build } = await import("vite");
@@ -182,23 +216,57 @@ export async function writeHtmlPages(
   files: Map<string, string>,
   config: SpoolConfig,
   passageLocationMap?: PassageLocationMap,
+  renderers?: PageRenderers,
 ): Promise<void> {
+  const md = renderers?.processMarkdown ?? processMarkdown;
+  const render = renderers?.renderLayout ?? renderLayout;
+
   for (const [relPath, content] of files) {
     const currentUrl = relPathToUrl(relPath);
     const navData = buildNavDataForUrl(config, files, currentUrl);
     const pageTitle = extractTitle(content) ?? navData.title;
-    const html = await processMarkdown(content, passageLocationMap, relPath);
-    const fullHtml = renderLayout(html, pageTitle, navData, currentUrl);
+    const html = await md(content, passageLocationMap, relPath);
+    const fullHtml = render(html, pageTitle, navData, currentUrl);
     const dest = urlToDest(destDir, currentUrl);
     await mkdir(dirname(dest), { recursive: true });
     await writeFile(dest, fullHtml, "utf-8");
   }
 }
 
-export async function startDevServer(
-  siteDir: string,
-  port: number,
-): Promise<{ port: number; stop(): Promise<void>; reload(): void }> {
+/**
+ * A running Vite dev server instance returned by startDevServer.
+ */
+export type DevServer = {
+  /**
+   * The port the dev server is actually listening on.
+   */
+  port: number;
+  /**
+   * Stops the dev server and closes all connections.
+   */
+  stop(): Promise<void>;
+  /**
+   * Sends a full page reload signal to all connected browsers.
+   */
+  reload(): void;
+  /**
+   * Sends a CSS HMR update so connected browsers re-fetch the stylesheet
+   * without a full page reload.
+   */
+  sendCssHmr(cssPath: string): void;
+  /**
+   * Loads a module via Vite's SSR transform pipeline, bypassing Node's module
+   * cache. Call invalidateModuleGraph first to ensure stale entries are evicted.
+   */
+  ssrLoadModule(path: string): Promise<Record<string, unknown>>;
+  /**
+   * Marks all entries in Vite's module graph as stale so the next ssrLoadModule
+   * call reloads them from disk.
+   */
+  invalidateModuleGraph(): void;
+};
+
+export async function startDevServer(siteDir: string, port: number): Promise<DevServer> {
   const { createServer } = await import("vite");
 
   const viteServer = await createServer({
@@ -207,7 +275,12 @@ export async function startDevServer(
     appType: "mpa",
     configFile: false,
     logLevel: "warn",
-    server: { port, strictPort: false },
+    esbuild: { jsx: "automatic" },
+    server: {
+      port,
+      strictPort: false,
+      fs: { allow: [SPOOL_PKG_ROOT, siteDir] },
+    },
     plugins: [
       {
         name: "spool-md-rewrite",
@@ -238,6 +311,25 @@ export async function startDevServer(
     },
     reload() {
       viteServer.ws.send({ type: "full-reload" });
+    },
+    sendCssHmr(cssPath: string) {
+      viteServer.ws.send({
+        type: "update",
+        updates: [
+          {
+            type: "css-update",
+            path: cssPath,
+            acceptedPath: cssPath,
+            timestamp: Date.now(),
+          },
+        ],
+      });
+    },
+    ssrLoadModule(path: string) {
+      return viteServer.ssrLoadModule(path) as Promise<Record<string, unknown>>;
+    },
+    invalidateModuleGraph() {
+      viteServer.moduleGraph.invalidateAll();
     },
   };
 }

@@ -1,47 +1,86 @@
-import React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import React, { useState } from "react";
+import { renderToString } from "react-dom/server";
 
+/**
+ * A link item in the sidebar navigation.
+ */
 type NavLink = { text: string; url: string };
-type NavGroup = { text: string; items: NavItem[]; expanded: boolean };
-export type NavItem = NavLink | NavGroup;
+
+/**
+ * A collapsible group item in the sidebar navigation.
+ */
+type NavGroupItem = { text: string; items: NavItem[]; expanded: boolean };
+
+/**
+ * A single item in the sidebar navigation — either a link or a nested group.
+ */
+export type NavItem = NavLink | NavGroupItem;
+
+/**
+ * Navigation structure and site title used to render the sidebar and page title.
+ */
 export type NavData = { title: string; sidebar: NavItem[] };
 
-function isGroup(item: NavItem): item is NavGroup {
+/**
+ * Returns true if the given nav item is a collapsible group.
+ */
+function isGroup(item: NavItem): item is NavGroupItem {
   return "items" in item;
 }
 
+/**
+ * Returns true if the given nav item is a link.
+ */
 function isLink(item: NavItem): item is NavLink {
   return "url" in item;
 }
 
+/**
+ * Returns true if the given nav link URL matches the current page URL.
+ */
 function urlMatchesPath(url: string, currentUrl: string): boolean {
   const normalizedUrl = url.replace(/\/$/, "");
   const normalizedCurrent = currentUrl.replace(/\/$/, "");
   return normalizedUrl === normalizedCurrent;
 }
 
-function NavItems({ items, currentUrl }: { items: NavItem[]; currentUrl: string }) {
+/**
+ * A collapsible sidebar group with a toggle button and optional child items.
+ * Used on both server (via renderToString) and client (via hydrateRoot).
+ */
+function NavGroup({ item, currentUrl }: { item: NavGroupItem; currentUrl: string }) {
+  const [expanded, setExpanded] = useState(item.expanded);
+
+  return (
+    <li className="spool-nav-group">
+      <button
+        type="button"
+        className="spool-nav-group-toggle"
+        onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+      >
+        <span className="spool-nav-group-title">{item.text}</span>
+        <span className="spool-nav-chevron" />
+      </button>
+      {expanded ? (
+        <ul className="spool-nav-group-children">
+          <NavItems items={item.items} currentUrl={currentUrl} />
+        </ul>
+      ) : null}
+    </li>
+  );
+}
+
+/**
+ * A list of sidebar navigation items, rendered identically on server and client.
+ * Exported so the client hydration entry point can reuse the same component tree.
+ */
+export function NavItems({ items, currentUrl }: { items: NavItem[]; currentUrl: string }) {
   return (
     <ul>
       {items.map((item, i) => {
         if (isGroup(item)) {
-          return (
-            <li key={i} className="spool-nav-group">
-              <button
-                type="button"
-                className="spool-nav-group-toggle"
-                data-expanded={item.expanded ? "true" : "false"}
-              >
-                <span className="spool-nav-group-title">{item.text}</span>
-                <span className="spool-nav-chevron" />
-              </button>
-              {item.expanded ? (
-                <ul className="spool-nav-group-children">
-                  <NavItems items={item.items} currentUrl={currentUrl} />
-                </ul>
-              ) : null}
-            </li>
-          );
+          return <NavGroup key={i} item={item} currentUrl={currentUrl} />;
         }
 
         if (isLink(item)) {
@@ -49,7 +88,7 @@ function NavItems({ items, currentUrl }: { items: NavItem[]; currentUrl: string 
           return (
             <li key={i}>
               <a href={item.url} className={isActive ? "spool-nav-active" : undefined}>
-                {item.text}
+                {item.text} Hi hello
               </a>
             </li>
           );
@@ -61,6 +100,9 @@ function NavItems({ items, currentUrl }: { items: NavItem[]; currentUrl: string 
   );
 }
 
+/**
+ * The full page layout, including the sidebar and main content area.
+ */
 function Layout({
   contentHtml,
   pageTitle,
@@ -101,6 +143,10 @@ function Layout({
   );
 }
 
+/**
+ * Renders the full page HTML string for a given content block and navigation state.
+ * Uses renderToString so the sidebar can be hydrated client-side without a mismatch.
+ */
 export function renderLayout(
   contentHtml: string,
   pageTitle: string,
@@ -109,7 +155,7 @@ export function renderLayout(
 ): string {
   return (
     "<!DOCTYPE html>" +
-    renderToStaticMarkup(
+    renderToString(
       <Layout
         contentHtml={contentHtml}
         pageTitle={pageTitle}

@@ -26,6 +26,13 @@ const mockViteServer = {
   ws: {
     send: vi.fn(),
   },
+  ssrLoadModule: vi.fn(async () => ({
+    processMarkdown: async (content: string) => `<p>${content}</p>`,
+    renderLayout: () => "<!DOCTYPE html><html></html>",
+  })),
+  moduleGraph: {
+    invalidateAll: vi.fn(),
+  },
 };
 const mockCreateViteServer = vi.fn(() => Promise.resolve(mockViteServer));
 const mockViteBuild = vi.fn(() => Promise.resolve());
@@ -44,6 +51,7 @@ vi.mock("./engine/process-markdown.ts", () => ({
 const { processMarkdown } = await import("./engine/process-markdown.ts");
 
 const { siteDevCommand, siteBuildCommand } = await import("./command.ts");
+const { ENGINE_SRC_DIR } = await import("./site-engine.ts");
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -188,16 +196,14 @@ describe("siteDevCommand", () => {
         await mkdir(join(root, "src"), { recursive: true });
         await createFile(root, "docs/guide.md", "# Guide");
 
-        let capturedListener: WatchListener | null = null;
-        mockWatch.mockImplementation(
-          (_path: string, _options: unknown, listener: WatchListener) => {
-            capturedListener = listener;
-          },
-        );
+        const watchListeners = new Map<string, WatchListener>();
+        mockWatch.mockImplementation((path: string, _options: unknown, listener: WatchListener) => {
+          watchListeners.set(path, listener);
+        });
 
         await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
 
-        capturedListener!("change", "guide.md");
+        watchListeners.get(join(root, "src"))!("change", "guide.md");
         expect(vi.getTimerCount()).toBe(1);
 
         await vi.advanceTimersByTimeAsync(199);
@@ -214,20 +220,19 @@ describe("siteDevCommand", () => {
         await mkdir(join(root, "src"), { recursive: true });
         await createFile(root, "docs/guide.md", "# Guide");
 
-        let capturedListener: WatchListener | null = null;
-        mockWatch.mockImplementation(
-          (_path: string, _options: unknown, listener: WatchListener) => {
-            capturedListener = listener;
-          },
-        );
+        const watchListeners = new Map<string, WatchListener>();
+        mockWatch.mockImplementation((path: string, _options: unknown, listener: WatchListener) => {
+          watchListeners.set(path, listener);
+        });
 
         const stdout = makeWritable();
         await siteDevCommand({ cwd: root, stdout, stderr: makeWritable() });
         const initialOutput = stdout.output;
 
-        capturedListener!("change", "a.md");
-        capturedListener!("change", "b.md");
-        capturedListener!("change", "c.md");
+        const srcListener = watchListeners.get(join(root, "src"))!;
+        srcListener("change", "a.md");
+        srcListener("change", "b.md");
+        srcListener("change", "c.md");
 
         expect(vi.getTimerCount()).toBe(1);
 
@@ -236,6 +241,131 @@ describe("siteDevCommand", () => {
         const expected = initialOutput + "Re-wove: 1 file(s) written.\n";
         await vi.waitFor(() => {
           expect(stdout.output).toBe(expected);
+        });
+      }));
+  });
+
+  describe("when the engine file watcher fires", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: false, toFake: ["setTimeout", "clearTimeout"] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    test("calls watch on the engine source directory with recursive: true", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/guide.md", "# Guide");
+
+        await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
+
+        expect(mockWatch).toHaveBeenCalledWith(
+          ENGINE_SRC_DIR,
+          { recursive: true },
+          expect.any(Function),
+        );
+      }));
+
+    test("sends a CSS HMR update when a CSS file changes", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/guide.md", "# Guide");
+
+        const watchListeners = new Map<string, WatchListener>();
+        mockWatch.mockImplementation((path: string, _options: unknown, listener: WatchListener) => {
+          watchListeners.set(path, listener);
+        });
+
+        await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
+
+        watchListeners.get(ENGINE_SRC_DIR)!("change", "spool-site.css");
+
+        await vi.advanceTimersByTimeAsync(200);
+        vi.useRealTimers();
+        await vi.waitFor(() => {
+          expect(mockViteServer.ws.send).toHaveBeenCalledWith(
+            expect.objectContaining({
+              type: "update",
+              updates: expect.arrayContaining([
+                expect.objectContaining({ type: "css-update", path: "/spool-site.css" }),
+              ]),
+            }),
+          );
+        });
+      }));
+
+    test("does not send a full reload when a CSS file changes", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/guide.md", "# Guide");
+
+        const watchListeners = new Map<string, WatchListener>();
+        mockWatch.mockImplementation((path: string, _options: unknown, listener: WatchListener) => {
+          watchListeners.set(path, listener);
+        });
+
+        await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
+
+        watchListeners.get(ENGINE_SRC_DIR)!("change", "spool-site.css");
+
+        await vi.advanceTimersByTimeAsync(200);
+        vi.useRealTimers();
+        await vi.waitFor(() => {
+          expect(mockViteServer.ws.send).not.toHaveBeenCalledWith(
+            expect.objectContaining({ type: "full-reload" }),
+          );
+        });
+      }));
+
+    test("sends a full reload and writes an update message when a React file changes", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/guide.md", "# Guide");
+
+        const watchListeners = new Map<string, WatchListener>();
+        mockWatch.mockImplementation((path: string, _options: unknown, listener: WatchListener) => {
+          watchListeners.set(path, listener);
+        });
+
+        const stdout = makeWritable();
+        await siteDevCommand({ cwd: root, stdout, stderr: makeWritable() });
+        const initialOutput = stdout.output;
+
+        watchListeners.get(ENGINE_SRC_DIR)!("change", "Layout.tsx");
+
+        await vi.advanceTimersByTimeAsync(200);
+        vi.useRealTimers();
+        await vi.waitFor(() => {
+          expect(mockViteServer.ws.send).toHaveBeenCalledWith({ type: "full-reload" });
+          expect(stdout.output).toBe(initialOutput + "Engine updated: re-rendered 1 page(s).\n");
+        });
+      }));
+
+    test("sends a full reload when a non-CSS non-React engine file changes", () =>
+      withTempDir(async (root) => {
+        await writeConfig(root);
+        await mkdir(join(root, "src"), { recursive: true });
+        await createFile(root, "docs/guide.md", "# Guide");
+
+        const watchListeners = new Map<string, WatchListener>();
+        mockWatch.mockImplementation((path: string, _options: unknown, listener: WatchListener) => {
+          watchListeners.set(path, listener);
+        });
+
+        await siteDevCommand({ cwd: root, stdout: makeWritable(), stderr: makeWritable() });
+
+        watchListeners.get(ENGINE_SRC_DIR)!("change", "process-markdown.ts");
+
+        await vi.advanceTimersByTimeAsync(200);
+        vi.useRealTimers();
+        await vi.waitFor(() => {
+          expect(mockViteServer.ws.send).toHaveBeenCalledWith({ type: "full-reload" });
         });
       }));
   });
