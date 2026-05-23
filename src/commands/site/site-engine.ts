@@ -51,7 +51,7 @@ export type PageRenderers = {
   /**
    * Wraps content HTML in the full page layout and returns the HTML string.
    */
-  renderLayout(html: string, pageTitle: string, navData: NavData, currentUrl: string): string;
+  renderLayout(html: string, pageTitle: string, navData: NavData, currentUrl: string, clientBundleVersion?: string): string;
 };
 
 async function buildClientBundle(outputDir: string): Promise<void> {
@@ -217,6 +217,7 @@ export async function writeHtmlPages(
   config: SpoolConfig,
   passageLocationMap?: PassageLocationMap,
   renderers?: PageRenderers,
+  clientBundleVersion?: string,
 ): Promise<void> {
   const md = renderers?.processMarkdown ?? processMarkdown;
   const render = renderers?.renderLayout ?? renderLayout;
@@ -226,7 +227,7 @@ export async function writeHtmlPages(
     const navData = buildNavDataForUrl(config, files, currentUrl);
     const pageTitle = extractTitle(content) ?? navData.title;
     const html = await md(content, passageLocationMap, relPath);
-    const fullHtml = render(html, pageTitle, navData, currentUrl);
+    const fullHtml = render(html, pageTitle, navData, currentUrl, clientBundleVersion);
     const dest = urlToDest(destDir, currentUrl);
     await mkdir(dirname(dest), { recursive: true });
     await writeFile(dest, fullHtml, "utf-8");

@@ -1,5 +1,5 @@
 import { watch } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { findProjectRoot, loadConfig } from "../../config.ts";
 import type { SpoolConfig } from "../../config.ts";
 import type { FileErrors } from "../../registries.ts";
@@ -16,6 +16,24 @@ import { weaveSiteFiles } from "./weave-site.ts";
 import type { WeaveSiteOptions } from "./weave-site.ts";
 
 type Writable = { write(s: string): void };
+
+/**
+ * Describes what types of files changed in the engine directory within a single
+ * debounce window. Flags are ORed across all watch events so that a directory-
+ * level event fired after a .tsx event does not lose knowledge of the .tsx change.
+ */
+type EngineChangeFlags = {
+  /**
+   * True if at least one .tsx or .jsx file changed. Signals that the client
+   * bundle must be rebuilt via prepareSiteDir.
+   */
+  hasTsx: boolean;
+  /**
+   * Basenames of .css files that changed. When this is non-empty and hasTsx is
+   * false the server sends a targeted CSS HMR update instead of a full reload.
+   */
+  cssFiles: string[];
+};
 
 export type SiteDevCommandOptions = {
   cwd: string;
@@ -43,12 +61,14 @@ export type SiteBuildCommandResult = {
 };
 
 /**
- * Handles a file change event in the engine source directory.
- * CSS changes trigger a hot CSS update; React/TS changes trigger a fresh SSR
- * re-render and a full page reload.
+ * Handles a batch of file change events in the engine source directory.
+ * Pure CSS changes trigger targeted HMR; any React/TS change triggers a fresh
+ * SSR re-render and full page reload. When the batch includes a .tsx/.jsx change
+ * the client bundle is also rebuilt via prepareSiteDir. Returns the (possibly
+ * updated) client bundle version for the caller to persist.
  */
 async function handleEngineChange(
-  filename: string,
+  flags: EngineChangeFlags,
   server: DevServer,
   siteDir: string,
   latestFiles: Map<string, string>,
@@ -56,22 +76,28 @@ async function handleEngineChange(
   config: SpoolConfig,
   projectRoot: string,
   stdout: Writable,
-): Promise<void> {
-  if (filename.endsWith(".css")) {
-    server.sendCssHmr(`/${filename}`);
-    return;
+  clientBundleVersion: string,
+): Promise<string> {
+  if (!flags.hasTsx && flags.cssFiles.length > 0) {
+    for (const cssFile of flags.cssFiles) {
+      server.sendCssHmr(`/${cssFile}`);
+    }
+    return clientBundleVersion;
   }
 
   server.invalidateModuleGraph();
 
-  if (filename.endsWith(".tsx") || filename.endsWith(".jsx")) {
+  let nextClientBundleVersion = clientBundleVersion;
+  if (flags.hasTsx) {
     await prepareSiteDir(projectRoot);
+    nextClientBundleVersion = Date.now().toString();
   }
 
   const renderers = await loadEngineRenderers(server);
-  await writeHtmlPages(siteDir, latestFiles, config, latestPassageMap, renderers);
+  await writeHtmlPages(siteDir, latestFiles, config, latestPassageMap, renderers, nextClientBundleVersion);
   server.reload();
   stdout.write(`Engine updated: re-rendered ${latestFiles.size} page(s).\n`);
+  return nextClientBundleVersion;
 }
 
 /**
@@ -118,11 +144,15 @@ export async function siteDevCommand({
   const siteDir = join(projectRoot, ".site");
   await prepareSiteDir(projectRoot);
 
+  let clientBundleVersion = Date.now().toString();
+
   await writeHtmlPages(
     siteDir,
     result.files,
     config,
     linkReferences ? result.passageLocationMap : undefined,
+    undefined,
+    clientBundleVersion,
   );
 
   const startPort = portOption ? parseInt(portOption, 10) : 5173;
@@ -135,6 +165,10 @@ export async function siteDevCommand({
 
   const sourceDir = join(projectRoot, config.source.code);
   const docsDir = join(projectRoot, config.source.docs);
+
+  const engineRelInSource = ENGINE_SRC_DIR.startsWith(sourceDir + sep)
+    ? ENGINE_SRC_DIR.slice(sourceDir.length + sep.length)
+    : null;
 
   let latestFiles = result.files;
   let latestPassageMap = linkReferences ? result.passageLocationMap : undefined;
@@ -150,7 +184,7 @@ export async function siteDevCommand({
         const r = await weaveSiteFiles(projectRoot, config, weaveOptions);
         latestFiles = r.files;
         latestPassageMap = linkReferences ? r.passageLocationMap : undefined;
-        await writeHtmlPages(siteDir, r.files, config, latestPassageMap);
+        await writeHtmlPages(siteDir, r.files, config, latestPassageMap, undefined, clientBundleVersion);
         server.reload();
         stdout.write(`Re-wove: ${r.files.size} file(s) written.\n`);
       } catch (err) {
@@ -160,18 +194,31 @@ export async function siteDevCommand({
   }
 
   let engineDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingTsxChange = false;
+  let pendingCssFiles: string[] = [];
 
   watch(ENGINE_SRC_DIR, { recursive: true }, (_event, filename) => {
     if (!filename) {
       return;
     }
+    if (filename.endsWith(".tsx") || filename.endsWith(".jsx")) {
+      pendingTsxChange = true;
+    } else if (filename.endsWith(".css")) {
+      pendingCssFiles.push(filename);
+    }
     if (engineDebounceTimer) {
       clearTimeout(engineDebounceTimer);
     }
     engineDebounceTimer = setTimeout(async () => {
+      const flags: EngineChangeFlags = {
+        hasTsx: pendingTsxChange,
+        cssFiles: pendingCssFiles,
+      };
+      pendingTsxChange = false;
+      pendingCssFiles = [];
       try {
-        await handleEngineChange(
-          filename,
+        clientBundleVersion = await handleEngineChange(
+          flags,
           server,
           siteDir,
           latestFiles,
@@ -179,6 +226,7 @@ export async function siteDevCommand({
           config,
           projectRoot,
           stdout,
+          clientBundleVersion,
         );
       } catch (err) {
         stderr.write(`Engine reload failed: ${err}\n`);
@@ -187,9 +235,13 @@ export async function siteDevCommand({
   });
 
   watch(sourceDir, { recursive: true }, (_event, filename) => {
-    if (filename) {
-      scheduleReweave();
+    if (!filename) {
+      return;
     }
+    if (engineRelInSource !== null && filename.startsWith(engineRelInSource + sep)) {
+      return;
+    }
+    scheduleReweave();
   });
 
   if (!docsDir.startsWith(sourceDir)) {

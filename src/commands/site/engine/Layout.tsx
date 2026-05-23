@@ -88,7 +88,7 @@ export function NavItems({ items, currentUrl }: { items: NavItem[]; currentUrl: 
           return (
             <li key={i}>
               <a href={item.url} className={isActive ? "spool-nav-active" : undefined}>
-                {item.text} Hi hello
+                {item.text} hi there
               </a>
             </li>
           );
@@ -108,12 +108,23 @@ function Layout({
   pageTitle,
   navData,
   currentUrl,
+  clientBundleVersion,
 }: {
   contentHtml: string;
   pageTitle: string;
   navData: NavData;
   currentUrl: string;
+  /**
+   * Optional cache-busting version string appended to the client bundle URL as
+   * `?v=<version>`. Used by the dev server so the browser always fetches a fresh
+   * copy of spool-client.js after a hot-reload rebuild.
+   */
+  clientBundleVersion?: string;
 }) {
+  const clientJsSrc = clientBundleVersion
+    ? `/spool-client.js?v=${clientBundleVersion}`
+    : "/spool-client.js";
+
   return (
     <html lang="en">
       <head>
@@ -137,7 +148,7 @@ function Layout({
         </div>
         <div id="spool-root" />
         <script src="/spool-mermaid.js" />
-        <script src="/spool-client.js" />
+        <script src={clientJsSrc} />
       </body>
     </html>
   );
@@ -152,6 +163,7 @@ export function renderLayout(
   pageTitle: string,
   navData: NavData,
   currentUrl: string,
+  clientBundleVersion?: string,
 ): string {
   return (
     "<!DOCTYPE html>" +
@@ -161,6 +173,7 @@ export function renderLayout(
         pageTitle={pageTitle}
         navData={navData}
         currentUrl={currentUrl}
+        clientBundleVersion={clientBundleVersion}
       />,
     )
   );
