@@ -1,6 +1,6 @@
 import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { basename, dirname, extname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MERMAID_DIST = createRequire(import.meta.url).resolve("mermaid/dist/mermaid.min.js");
@@ -9,7 +9,7 @@ import type { SpoolConfig } from "../../config.ts";
 import type { PassageLocationMap } from "./reference-map.ts";
 import { processMarkdown } from "./engine/process-markdown.ts";
 import { renderLayout } from "./engine/Layout.tsx";
-import type { NavData } from "./engine/Layout.tsx";
+import type { NavItem, NavData } from "./engine/Layout.tsx";
 
 export type { NavData };
 
@@ -51,14 +51,11 @@ function extractTitle(content: string): string | undefined {
   return content.match(/^#\s+(.+)$/m)?.[1]?.trim();
 }
 
-function relPathToLabel(relPath: string): string {
-  const base = basename(relPath, extname(relPath));
-  return base === "index"
-    ? "Overview"
-    : base
-        .replace(/^\d+-/, "")
-        .replace(/-/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+function titleCase(str: string): string {
+  return str
+    .replace(/^\d+-/, "")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function relPathToUrl(relPath: string): string {
@@ -74,47 +71,125 @@ function urlToDest(destDir: string, url: string): string {
   return join(destDir, path);
 }
 
-export function buildNavData(config: SpoolConfig, files: Map<string, string>): NavData {
+type FileTree = {
+  files: Map<string, string>;
+  dirs: Map<string, FileTree>;
+};
+
+function buildFileTree(files: Map<string, string>): FileTree {
+  const tree: FileTree = { files: new Map(), dirs: new Map() };
+
+  for (const [relPath, content] of files) {
+    const parts = relPath.split("/");
+    let current = tree;
+
+    for (let i = 0; i < parts.length - 1; i++) {
+      const dirName = parts[i]!;
+      if (!current.dirs.has(dirName)) {
+        current.dirs.set(dirName, { files: new Map(), dirs: new Map() });
+      }
+      current = current.dirs.get(dirName)!;
+    }
+
+    const fileName = parts[parts.length - 1]!;
+    current.files.set(fileName, content);
+  }
+
+  return tree;
+}
+
+function treeToNavItems(tree: FileTree, currentDirPath: string, currentUrl: string): NavItem[] {
+  const items: NavItem[] = [];
+
+  const indexVariants = ["index.md", "readme.md", "README.md"];
+  const indexFile = tree.files.keys().find((f) => indexVariants.includes(f));
+
+  const sortedFileNames = [...tree.files.keys()].filter((f) => f !== indexFile).sort();
+
+  if (indexFile) {
+    sortedFileNames.unshift(indexFile);
+  }
+
+  for (const fileName of sortedFileNames) {
+    const content = tree.files.get(fileName)!;
+    const relPath = currentDirPath ? currentDirPath + "/" + fileName : fileName;
+    const label = extractTitle(content) ?? titleCase(fileName.replace(/\.md$/, ""));
+    const url = relPathToUrl(relPath);
+
+    items.push({ text: label, url });
+  }
+
+  const sortedDirNames = [...tree.dirs.keys()].sort();
+
+  for (const dirName of sortedDirNames) {
+    const subTree = tree.dirs.get(dirName)!;
+    const dirUrl = currentDirPath ? currentDirPath + "/" + dirName : dirName;
+    const childItems = treeToNavItems(subTree, dirUrl, currentUrl);
+
+    const isExpanded = urlStartsWith(currentUrl, "/" + dirUrl);
+
+    items.push({
+      text: titleCase(dirName),
+      items: childItems,
+      expanded: isExpanded,
+    });
+  }
+
+  return items;
+}
+
+function urlStartsWith(url: string, prefix: string): boolean {
+  const normalizedUrl = url.replace(/\/$/, "");
+  const normalizedPrefix = prefix.replace(/\/$/, "");
+  return normalizedUrl === normalizedPrefix || normalizedUrl.startsWith(normalizedPrefix + "/");
+}
+
+function buildNavDataForUrl(
+  config: SpoolConfig,
+  files: Map<string, string>,
+  currentUrl: string,
+): NavData {
   const title: string =
     ((config.site as Record<string, unknown> | undefined)?.title as string) ?? "Docs";
 
-  type NavItem = { text: string; url: string } | { text: string; items: NavItem[] };
+  const tree = buildFileTree(files);
   const sidebar: NavItem[] = [];
-  const groups = new Map<string, NavItem[]>();
 
-  for (const relPath of [...files.keys()].sort()) {
-    const content = files.get(relPath) ?? "";
-    const label = extractTitle(content) ?? relPathToLabel(relPath);
-    const url = relPathToUrl(relPath);
-    const parts = relPath.split("/");
+  const indexVariants = ["index.md", "readme.md", "README.md"];
+  const rootIndexFile = tree.files.keys().find((f) => indexVariants.includes(f));
 
-    if (parts.length === 1) {
-      sidebar.push({ text: label, url });
-    } else {
-      const dir = parts[0]!;
-      if (!groups.has(dir)) {
-        const groupItems: NavItem[] = [];
-        groups.set(dir, groupItems);
-        sidebar.push({ text: relPathToLabel(dir + ".md"), items: groupItems });
-      }
-      groups.get(dir)!.push({ text: label, url });
-    }
+  if (rootIndexFile) {
+    sidebar.push({ text: "Home", url: "/" });
+    tree.files.delete(rootIndexFile);
   }
 
+  const rootItems = treeToNavItems(tree, "", currentUrl);
+  sidebar.push(...rootItems);
+
   return { title, sidebar };
+}
+
+export function buildNavData(
+  config: SpoolConfig,
+  files: Map<string, string>,
+  currentUrl: string,
+): NavData {
+  return buildNavDataForUrl(config, files, currentUrl);
 }
 
 export async function writeHtmlPages(
   destDir: string,
   files: Map<string, string>,
-  navData: NavData,
+  config: SpoolConfig,
   passageLocationMap?: PassageLocationMap,
 ): Promise<void> {
   for (const [relPath, content] of files) {
+    const currentUrl = relPathToUrl(relPath);
+    const navData = buildNavDataForUrl(config, files, currentUrl);
     const pageTitle = extractTitle(content) ?? navData.title;
     const html = await processMarkdown(content, passageLocationMap, relPath);
-    const fullHtml = renderLayout(html, pageTitle, navData);
-    const dest = urlToDest(destDir, relPathToUrl(relPath));
+    const fullHtml = renderLayout(html, pageTitle, navData, currentUrl);
+    const dest = urlToDest(destDir, currentUrl);
     await mkdir(dirname(dest), { recursive: true });
     await writeFile(dest, fullHtml, "utf-8");
   }
@@ -176,8 +251,7 @@ export async function buildSite(
   const distDir = join(projectRoot, ".site", "dist", "static");
   await mkdir(distDir, { recursive: true });
 
-  const navData = buildNavData(config, files);
-  await writeHtmlPages(distDir, files, navData, passageLocationMap);
+  await writeHtmlPages(distDir, files, config, passageLocationMap);
 
   await copyFile(join(ENGINE_SRC_DIR, "spool-site.css"), join(distDir, "spool-site.css"));
   await copyFile(MERMAID_DIST, join(distDir, "spool-mermaid.js"));

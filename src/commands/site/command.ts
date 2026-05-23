@@ -65,11 +65,11 @@ export async function siteDevCommand({
   const siteDir = join(projectRoot, ".site");
   await prepareSiteDir(projectRoot);
 
-  const navData = buildNavData(config, result.files);
+  const homeNavData = buildNavData(config, result.files, "/");
   await writeHtmlPages(
     siteDir,
     result.files,
-    navData,
+    config,
     linkReferences ? result.passageLocationMap : undefined,
   );
 
@@ -91,11 +91,10 @@ export async function siteDevCommand({
     debounceTimer = setTimeout(async () => {
       try {
         const r = await weaveSiteFiles(projectRoot, config, weaveOptions);
-        const nd = buildNavData(config, r.files);
         await writeHtmlPages(
           siteDir,
           r.files,
-          nd,
+          config,
           linkReferences ? r.passageLocationMap : undefined,
         );
         server.reload();

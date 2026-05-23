@@ -57,6 +57,12 @@ body {
   overflow-y: auto;
 }
 
+.spool-sidebar ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 .spool-site-title {
   display: block;
   font-weight: 700;
@@ -66,16 +72,6 @@ body {
   margin-bottom: 1.25rem;
 }
 
-.spool-sidebar nav ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.spool-sidebar nav li {
-  margin: 0.15rem 0;
-}
-
 .spool-sidebar nav a {
   display: block;
   padding: 0.2rem 0.5rem;
@@ -83,6 +79,8 @@ body {
   text-decoration: none;
   border-radius: 4px;
   font-size: 0.9rem;
+  font-weight: 400;
+  line-height: 1.6;
 }
 
 .spool-sidebar nav a:hover {
@@ -90,19 +88,64 @@ body {
   color: var(--color-sidebar-hover-text);
 }
 
-.spool-nav-group-title {
-  display: block;
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-muted);
-  padding: 0.5rem 0.5rem 0.2rem;
-  margin-top: 0.5rem;
+.spool-nav-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--color-sidebar-link);
+  line-height: 1.6;
+  font-weight: bold;
 }
 
-.spool-nav-group > ul {
-  padding-left: 0.75rem;
+.spool-nav-group-toggle:hover {
+  background: var(--color-sidebar-hover-bg);
+  color: var(--color-sidebar-hover-text);
+}
+
+.spool-nav-group-title {
+  display: inline;
+  font-weight: inherit;
+  font-size: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+}
+
+.spool-nav-chevron {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid var(--color-text-muted);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.spool-nav-group-toggle[aria-expanded="true"] .spool-nav-chevron {
+  transform: rotate(90deg);
+}
+
+.spool-nav-group-children > ul {
+  margin-left: 1rem;
+}
+
+.spool-nav-active {
+  background: var(--color-sidebar-hover-bg);
+  color: var(--color-sidebar-hover-text);
+  font-weight: 500;
 }
 
 .spool-content {
