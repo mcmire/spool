@@ -144,6 +144,8 @@ function Layout({
         </div>
         <div id="spool-root" />
         <script src="/spool-mermaid.js" />
+        {/* Prevent mermaid from auto-rendering before we can set the correct theme. */}
+        <script dangerouslySetInnerHTML={{ __html: "mermaid.initialize({startOnLoad:false})" }} />
         {devClientSrc ? (
           <script type="module" src={devClientSrc} />
         ) : (

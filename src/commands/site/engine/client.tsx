@@ -54,8 +54,16 @@ function SpoolEffects() {
   }, [hash]);
 
   useEffect(() => {
-    mermaid.initialize({ startOnLoad: false });
-    void mermaid.run();
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+    function runMermaid() {
+      mermaid.initialize({ startOnLoad: false, theme: mediaQuery.matches ? "dark" : "default" });
+      void mermaid.run();
+    }
+
+    runMermaid();
+    mediaQuery.addEventListener("change", runMermaid);
+    return () => mediaQuery.removeEventListener("change", runMermaid);
   }, []);
 
   return null;
