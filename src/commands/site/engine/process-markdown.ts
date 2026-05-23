@@ -111,7 +111,7 @@ export async function processMarkdown(
   p.use(remarkRehype, { allowDangerousHtml: true })
     .use(mermaidPlugin)
     .use(spoolPassageWrapper)
-    .use(rehypeShiki, { theme: "github-dark" })
+    .use(rehypeShiki, { themes: { light: "github-light", dark: "github-dark" } })
     .use(rehypeSlug)
     .use(rehypeStringify);
 

@@ -14,7 +14,17 @@
   --color-sidebar-hover-text: #111827;
   --color-link: #2563eb;
   --color-code-bg: #f3f4f6;
+  --color-pre-bg: #f6f8fa;
+  --color-pre-text: #24292e;
   --color-spool-ref: #7c3aed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .shiki,
+  .shiki span {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -28,6 +38,8 @@
     --color-sidebar-hover-text: #f1f5f9;
     --color-link: #60a5fa;
     --color-code-bg: #1e2433;
+    --color-pre-bg: #1e1e2e;
+    --color-pre-text: #cdd6f4;
     --color-spool-ref: #a78bfa;
   }
 }
@@ -195,8 +207,8 @@ body {
 }
 
 .spool-content pre {
-  background: #1e1e2e;
-  color: #cdd6f4;
+  background: var(--color-pre-bg);
+  color: var(--color-pre-text);
   padding: 1rem 1.25rem;
   border-radius: 6px;
   overflow-x: auto;
