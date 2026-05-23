@@ -113,7 +113,7 @@ export async function processMarkdown(
     .use(spoolPassageWrapper)
     .use(rehypeShiki, { themes: { light: "github-light", dark: "github-dark" } })
     .use(rehypeSlug)
-    .use(rehypeStringify);
+    .use(rehypeStringify, { allowDangerousHtml: true });
 
   return String(await p.process(content));
 }
