@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { renderToString } from "react-dom/server";
 
 /**
@@ -50,6 +50,10 @@ function urlMatchesPath(url: string, currentUrl: string): boolean {
  */
 function NavGroup({ item, currentUrl }: { item: NavGroupItem; currentUrl: string }) {
   const [expanded, setExpanded] = useState(item.expanded);
+
+  useEffect(() => {
+    setExpanded(item.expanded);
+  }, [item.expanded]);
 
   return (
     <li className="spool-nav-group">
