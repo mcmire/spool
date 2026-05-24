@@ -589,4 +589,95 @@ describe("parsePassageReferences", () => {
       ]);
     });
   });
+
+  describe("ignore directives", () => {
+    test("ignore-start/ignore-end directive lines are added to directiveLineNums", () => {
+      const { directiveLineNums, errors } = parsePassageReferences(
+        [
+          "before",
+          "<!-- ::SPOOL:: ignore-start -->",
+          "example content",
+          "<!-- ::SPOOL:: ignore-end -->",
+          "after",
+        ].join("\n"),
+      );
+
+      expect(errors).toEqual([]);
+      expect(directiveLineNums).toEqual(new Set([2, 4]));
+    });
+
+    test("ignore-next directive line is added to directiveLineNums", () => {
+      const { directiveLineNums, errors } = parsePassageReferences(
+        ["before", "<!-- ::SPOOL:: ignore-next -->", "example content", "after"].join("\n"),
+      );
+
+      expect(errors).toEqual([]);
+      expect(directiveLineNums).toEqual(new Set([2]));
+    });
+
+    test("refs inside an ignore block are not parsed", () => {
+      const { refs, errors } = parsePassageReferences(
+        [
+          "<!-- ::SPOOL:: ignore-start -->",
+          "// ::SPOOL:: <<src/car.ts#car>>",
+          "<!-- ::SPOOL:: ignore-end -->",
+        ].join("\n"),
+      );
+
+      expect(errors).toEqual([]);
+      expect(refs).toHaveLength(0);
+    });
+
+    test("malformed ::SPOOL:: inside an ignore block produces no error", () => {
+      const { errors } = parsePassageReferences(
+        [
+          "<!-- ::SPOOL:: ignore-start -->",
+          "::SPOOL::",
+          "<!-- ::SPOOL:: ignore-end -->",
+        ].join("\n"),
+      );
+
+      expect(errors).toEqual([]);
+    });
+
+    test("refs before and after an ignore block are still parsed", () => {
+      const { refs, errors } = parsePassageReferences(
+        [
+          "// ::SPOOL:: <<src/before.ts#before>>",
+          "<!-- ::SPOOL:: ignore-start -->",
+          "// ::SPOOL:: <<src/ignored.ts#ignored>>",
+          "<!-- ::SPOOL:: ignore-end -->",
+          "// ::SPOOL:: <<src/after.ts#after>>",
+        ].join("\n"),
+      );
+
+      expect(errors).toEqual([]);
+      expect(refs).toHaveLength(2);
+      expect(refs[0]!.passageName).toBe("before");
+      expect(refs[1]!.passageName).toBe("after");
+    });
+
+    test("ignore-next skips the ref on the following line", () => {
+      const { refs, errors } = parsePassageReferences(
+        [
+          "<!-- ::SPOOL:: ignore-next -->",
+          "// ::SPOOL:: <<src/car.ts#car>>",
+          "// ::SPOOL:: <<src/boat.ts#boat>>",
+        ].join("\n"),
+      );
+
+      expect(errors).toEqual([]);
+      expect(refs).toHaveLength(1);
+      expect(refs[0]!.passageName).toBe("boat");
+    });
+
+    test("source-code-style ignore directives also work", () => {
+      const { directiveLineNums, errors } = parsePassageReferences(
+        ["before", "// ::SPOOL:: ignore-next", "example content", "after"].join("\n"),
+      );
+
+      expect(errors).toEqual([]);
+      expect(directiveLineNums).toEqual(new Set([2]));
+    });
+  });
 });

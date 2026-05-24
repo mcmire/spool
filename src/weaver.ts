@@ -62,7 +62,7 @@ export function weaveFile(
   templateRegistry: PassageTemplateRegistry,
   passagePositions: PassagePositions,
 ): { output: string; errors: ParseError[] } {
-  const { refs, errors } = parsePassageReferences(docContent);
+  const { refs, directiveLineNums, errors } = parsePassageReferences(docContent);
   const lines = docContent.split("\n");
 
   for (const ref of refs) {
@@ -131,7 +131,8 @@ export function weaveFile(
     }
   }
 
-  return { output: lines.join("\n"), errors };
+  const outputLines = lines.filter((_, i) => !directiveLineNums.has(i + 1));
+  return { output: outputLines.join("\n"), errors };
 }
 
 export type WeaveResult = {

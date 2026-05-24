@@ -37,7 +37,7 @@ export const VALID_MODIFIERS = new Set(["no-expand-nested"]);
 // ::SPOOL:: ignore-start
 const SOURCE_ANNOTATION_RE = /^(.*?)(?:==\s*)?::SPOOL::\s+(start|end)\(#([\w-]+)\)(?:\s*==)?\s*$/;
 const SOURCE_DIRECTIVE_RE = /^.*?::SPOOL::\s+(\S+)/;
-const SOURCE_IGNORE_RE = /^.*?::SPOOL::\s+(ignore-start|ignore-end|ignore-next)\s*$/;
+const SOURCE_IGNORE_RE = /^.*?::SPOOL::\s+(ignore-start|ignore-end|ignore-next)\s*(?:-->)?\s*$/;
 const PASSAGE_REFERENCE_RE = /^(.*?)::SPOOL::\s+<<(.+?)(?:#([\w-]+))?(?::([\w-]+))?>>/;
 const PASSAGE_RANGE_RE =
   /^(.*?)::SPOOL::\s+<<(.+?)@((?:START|END|start\(#[\w-]+\)|end\(#[\w-]+\)))\.\.((?:START|END|start\(#[\w-]+\)|end\(#[\w-]+\)))>>/;
@@ -264,14 +264,41 @@ function parseRangeMarker(marker: string): RangeMarker {
 
 export function parsePassageReferences(content: string): {
   refs: PassageReference[];
+  directiveLineNums: Set<number>;
   errors: ParseError[];
 } {
   const refs: PassageReference[] = [];
   const errors: ParseError[] = [];
+  const directiveLineNums = new Set<number>();
   const lines = content.split("\n");
+  let ignoring = false;
+  let ignoreNext = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+    const lineNum = i + 1;
+
+    const ignoreMatch = SOURCE_IGNORE_RE.exec(line);
+    if (ignoreMatch) {
+      directiveLineNums.add(lineNum);
+      const directive = ignoreMatch[1]!;
+      if (directive === "ignore-next") {
+        ignoreNext = true;
+      } else {
+        ignoring = directive === "ignore-start";
+      }
+      continue;
+    }
+
+    if (ignoring) {
+      continue;
+    }
+
+    if (ignoreNext) {
+      ignoreNext = false;
+      continue;
+    }
+
     const rangeMatch = PASSAGE_RANGE_RE.exec(line);
     if (rangeMatch) {
       const rangeStartStr = rangeMatch[3]!;
@@ -343,5 +370,5 @@ export function parsePassageReferences(content: string): {
     }
   }
 
-  return { refs, errors };
+  return { refs, directiveLineNums, errors };
 }

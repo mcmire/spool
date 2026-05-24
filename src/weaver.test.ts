@@ -250,6 +250,90 @@ describe("weaveFile", () => {
       expect(errors).toHaveLength(1);
     });
   });
+
+  describe("when the doc contains ignore directives", () => {
+    test("ignore-start/ignore-end removes only the directive lines from output, keeping content", () => {
+      const { registry, templateRegistry, passagePositions } = makeRegistries({});
+
+      const doc = [
+        "before",
+        "<!-- ::SPOOL:: ignore-start -->",
+        "example content",
+        "<!-- ::SPOOL:: ignore-end -->",
+        "after",
+      ].join("\n");
+
+      const { output, errors } = weaveFile(doc, registry, templateRegistry, passagePositions);
+
+      expect(errors).toEqual([]);
+      expect(output).toBe("before\nexample content\nafter");
+    });
+
+    test("ignore-next removes only the directive line from output, keeping the protected line", () => {
+      const { registry, templateRegistry, passagePositions } = makeRegistries({});
+
+      const doc = [
+        "before",
+        "<!-- ::SPOOL:: ignore-next -->",
+        "example content",
+        "after",
+      ].join("\n");
+
+      const { output, errors } = weaveFile(doc, registry, templateRegistry, passagePositions);
+
+      expect(errors).toEqual([]);
+      expect(output).toBe("before\nexample content\nafter");
+    });
+
+    test("passage refs inside an ignore block pass through as literal text with no errors", () => {
+      const { registry, templateRegistry, passagePositions } = makeRegistries({
+        "src/car.ts:car": { registry: "class Car {}" },
+      });
+
+      const doc = [
+        "<!-- ::SPOOL:: ignore-start -->",
+        "// ::SPOOL:: <<src/car.ts#car>>",
+        "<!-- ::SPOOL:: ignore-end -->",
+      ].join("\n");
+
+      const { output, errors } = weaveFile(doc, registry, templateRegistry, passagePositions);
+
+      expect(errors).toEqual([]);
+      expect(output).toBe("// ::SPOOL:: <<src/car.ts#car>>");
+    });
+
+    test("unknown refs inside an ignore block produce no errors", () => {
+      const { registry, templateRegistry, passagePositions } = makeRegistries({});
+
+      const doc = [
+        "<!-- ::SPOOL:: ignore-next -->",
+        "// ::SPOOL:: <<src/does-not-exist.ts#missing>>",
+      ].join("\n");
+
+      const { output, errors } = weaveFile(doc, registry, templateRegistry, passagePositions);
+
+      expect(errors).toEqual([]);
+      expect(output).toBe("// ::SPOOL:: <<src/does-not-exist.ts#missing>>");
+    });
+
+    test("passage refs outside an ignore block are still expanded", () => {
+      const { registry, templateRegistry, passagePositions } = makeRegistries({
+        "src/car.ts:car": { registry: "class Car {}" },
+      });
+
+      const doc = [
+        "<!-- ::SPOOL:: ignore-start -->",
+        "example",
+        "<!-- ::SPOOL:: ignore-end -->",
+        "// ::SPOOL:: <<src/car.ts#car>>",
+      ].join("\n");
+
+      const { output, errors } = weaveFile(doc, registry, templateRegistry, passagePositions);
+
+      expect(errors).toEqual([]);
+      expect(output).toBe("example\nclass Car {}");
+    });
+  });
 });
 
 describe("weaveProject", () => {
