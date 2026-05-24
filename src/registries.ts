@@ -47,6 +47,7 @@ export async function buildRegistries(
   const allErrors: FileErrors[] = [];
   const sourceDir = join(projectRoot, config.source.code);
   const docsDir = join(projectRoot, config.source.docs);
+  const targetDir = join(projectRoot, config.target);
 
   const excludePatterns = config.source.excludeFromCode ?? [];
 
@@ -55,8 +56,7 @@ export async function buildRegistries(
     const fullPath = join(sourceDir, entry);
     const relPath = relative(projectRoot, fullPath);
 
-    // Skip sourceDocsDir
-    if (fullPath.startsWith(docsDir)) {
+    if (fullPath.startsWith(docsDir) || fullPath.startsWith(targetDir)) {
       continue;
     }
 

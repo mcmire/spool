@@ -168,6 +168,33 @@ describe("buildRegistries", () => {
       }));
   });
 
+  describe("when a file is inside the target directory", () => {
+    test("excludes it from the registry", () =>
+      withTempDir(async (root) => {
+        await createFile(
+          root,
+          "out/guide.ts",
+          ["// ::SPOOL:: start(#guide)", "compiled content", "// ::SPOOL:: end(#guide)"].join("\n"),
+        );
+        await createFile(
+          root,
+          "src/car.ts",
+          ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
+        );
+
+        const config: SpoolConfig = {
+          source: { code: ".", docs: "docs" },
+          target: "out",
+        };
+
+        const { registry, errors } = await buildRegistries(root, config);
+
+        expect(errors).toEqual([]);
+        expect(registry.has("out/guide.ts:guide")).toBe(false);
+        expect(registry.get("src/car.ts:car")).toBe("class Car {}");
+      }));
+  });
+
   describe("when a file matches an excludeFromCode pattern", () => {
     test("excludes it from the registry", () =>
       withTempDir(async (root) => {
