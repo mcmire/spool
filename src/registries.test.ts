@@ -398,4 +398,43 @@ describe("buildRegistries", () => {
         expect(registry.get("src/a/b/deep.ts:deep")).toBe("deep content");
       }));
   });
+
+  describe("when a dotfile exists in the source directory", () => {
+    test("includes it in the registry", () =>
+      withTempDir(async (root) => {
+        await createFile(root, "src/.env.example", "API_KEY=\n");
+
+        const { registry, errors } = await buildRegistries(root, makeConfig());
+
+        expect(errors).toEqual([]);
+        expect(registry.has("src/.env.example:")).toBe(true);
+      }));
+  });
+
+  describe("when a file is inside a hidden directory in the source directory", () => {
+    test("includes it in the registry", () =>
+      withTempDir(async (root) => {
+        await createFile(root, "src/.hidden/config.ts", "export const x = 1;\n");
+
+        const { registry, errors } = await buildRegistries(root, makeConfig());
+
+        expect(errors).toEqual([]);
+        expect(registry.has("src/.hidden/config.ts:")).toBe(true);
+      }));
+  });
+
+  describe("when an excludeFromCode pattern targets a hidden directory", () => {
+    test("excludes files inside that directory from the registry", () =>
+      withTempDir(async (root) => {
+        await createFile(root, "src/.site/.vitepress/config.js", "export default {};\n");
+        await createFile(root, "src/car.ts", "export class Car {}\n");
+
+        const config = makeConfig({ excludeFromCode: [".site/**"] });
+        const { registry, errors } = await buildRegistries(root, config);
+
+        expect(errors).toEqual([]);
+        expect(registry.has("src/.site/.vitepress/config.js:")).toBe(false);
+        expect(registry.has("src/car.ts:")).toBe(true);
+      }));
+  });
 });

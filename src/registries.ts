@@ -51,7 +51,7 @@ export async function buildRegistries(
 
   const excludePatterns = config.source.excludeFromCode ?? [];
 
-  const entries = await fg("**/*", { cwd: sourceDir, dot: false, onlyFiles: true });
+  const entries = await fg("**/*", { cwd: sourceDir, dot: true, onlyFiles: true });
   for (const entry of entries) {
     const fullPath = join(sourceDir, entry);
     const relPath = relative(projectRoot, fullPath);
@@ -60,8 +60,7 @@ export async function buildRegistries(
       continue;
     }
 
-    // Skip excluded patterns
-    if (excludePatterns.length > 0 && micromatch.isMatch(relPath, excludePatterns)) {
+    if (excludePatterns.length > 0 && micromatch.isMatch(entry, excludePatterns, { dot: true })) {
       continue;
     }
 

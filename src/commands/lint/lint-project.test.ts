@@ -221,6 +221,38 @@ describe("lintProject", () => {
         }));
     });
 
+    describe("when a source file matches excludeFromCode and has no markers", () => {
+      test("does not include it in unmarkedFiles", () =>
+        withTempDir(async (root) => {
+          await createFile(root, "src/utils.test.ts", "export function noop() {}");
+          await createFile(root, "docs/guide.md", "# Guide");
+
+          const config = makeConfig({ excludeFromCode: ["**/*.test.ts"] });
+          const { unmarkedFiles } = await lintProject(root, config, { coverage: true });
+
+          expect(unmarkedFiles).toEqual([]);
+        }));
+    });
+
+    describe("when a source file matches excludeFromCode and has passages", () => {
+      test("does not include its passages in unreferencedPassages", () =>
+        withTempDir(async (root) => {
+          await createFile(
+            root,
+            "src/car.test.ts",
+            ["// ::SPOOL:: start(#car-test)", "test content", "// ::SPOOL:: end(#car-test)"].join(
+              "\n",
+            ),
+          );
+          await createFile(root, "docs/guide.md", "# Guide");
+
+          const config = makeConfig({ excludeFromCode: ["**/*.test.ts"] });
+          const { unreferencedPassages } = await lintProject(root, config, { coverage: true });
+
+          expect(unreferencedPassages).toEqual([]);
+        }));
+    });
+
     describe("when coverage is not enabled", () => {
       test("does not return unmarkedFiles or unreferencedPassages", () =>
         withTempDir(async (root) => {
