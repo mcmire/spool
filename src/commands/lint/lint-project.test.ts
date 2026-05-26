@@ -221,6 +221,36 @@ describe("lintProject", () => {
         }));
     });
 
+    describe("when a source file with no markers is referenced whole-file in a doc", () => {
+      test("does not include it in unmarkedFiles", () =>
+        withTempDir(async (root) => {
+          await createFile(root, "src/utils.ts", "export function noop() {}");
+          await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/utils.ts>>");
+
+          const { unmarkedFiles } = await lintProject(root, makeConfig(), { coverage: true });
+
+          expect(unmarkedFiles).toEqual([]);
+        }));
+    });
+
+    describe("when a source file with passages is referenced whole-file in a doc", () => {
+      test("does not include its passages in unreferencedPassages", () =>
+        withTempDir(async (root) => {
+          await createFile(
+            root,
+            "src/car.ts",
+            ["// ::SPOOL:: start(#car)", "class Car {}", "// ::SPOOL:: end(#car)"].join("\n"),
+          );
+          await createFile(root, "docs/guide.md", "// ::SPOOL:: <<src/car.ts>>");
+
+          const { unreferencedPassages } = await lintProject(root, makeConfig(), {
+            coverage: true,
+          });
+
+          expect(unreferencedPassages).toEqual([]);
+        }));
+    });
+
     describe("when a source file matches excludeFromCode and has no markers", () => {
       test("does not include it in unmarkedFiles", () =>
         withTempDir(async (root) => {

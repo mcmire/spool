@@ -28,6 +28,7 @@ export async function lintProject(
   const docErrors: FileErrors[] = [];
   const docsDir = join(projectRoot, config.source.docs);
   const referencedPassageKeys = new Set<string>();
+  const wholeFileReferencedPaths = new Set<string>();
 
   const entries = await fg("**/*.md", { cwd: docsDir });
   for (const entry of entries) {
@@ -72,8 +73,12 @@ export async function lintProject(
           column: ref.column,
           message: `Unknown reference: ${ref.raw}`,
         });
-      } else if (options.coverage && ref.passageName) {
-        referencedPassageKeys.add(key);
+      } else if (options.coverage) {
+        if (ref.passageName) {
+          referencedPassageKeys.add(key);
+        } else {
+          wholeFileReferencedPaths.add(fileRelPath);
+        }
       }
     }
 
@@ -101,7 +106,7 @@ export async function lintProject(
 
   const unmarkedFiles: string[] = [];
   for (const relPath of passagePositions.keys()) {
-    if (!filesWithPassages.has(relPath)) {
+    if (!filesWithPassages.has(relPath) && !wholeFileReferencedPaths.has(relPath)) {
       unmarkedFiles.push(relPath);
     }
   }
@@ -111,10 +116,13 @@ export async function lintProject(
   for (const key of allNamedPassageKeys) {
     if (!referencedPassageKeys.has(key)) {
       const colonIdx = key.indexOf(":");
-      unreferencedPassages.push({
-        filePath: key.slice(0, colonIdx),
-        passageName: key.slice(colonIdx + 1),
-      });
+      const filePath = key.slice(0, colonIdx);
+      if (!wholeFileReferencedPaths.has(filePath)) {
+        unreferencedPassages.push({
+          filePath,
+          passageName: key.slice(colonIdx + 1),
+        });
+      }
     }
   }
   unreferencedPassages.sort(
