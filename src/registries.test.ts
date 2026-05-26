@@ -437,4 +437,67 @@ describe("buildRegistries", () => {
         expect(registry.has("src/car.ts:")).toBe(true);
       }));
   });
+
+  describe("when a .gitignore file exists in the project root", () => {
+    test("excludes source files matching its patterns", () =>
+      withTempDir(async (root) => {
+        await writeFile(join(root, ".gitignore"), "*.log\n");
+        await createFile(root, "src/debug.log", "log content\n");
+        await createFile(root, "src/car.ts", "export class Car {}\n");
+
+        const { registry, errors } = await buildRegistries(root, makeConfig());
+
+        expect(errors).toEqual([]);
+        expect(registry.has("src/debug.log:")).toBe(false);
+        expect(registry.has("src/car.ts:")).toBe(true);
+      }));
+
+    test("ignores comment lines and blank lines", () =>
+      withTempDir(async (root) => {
+        await writeFile(join(root, ".gitignore"), "# a comment\n\n*.log\n");
+        await createFile(root, "src/debug.log", "log content\n");
+        await createFile(root, "src/car.ts", "export class Car {}\n");
+
+        const { registry } = await buildRegistries(root, makeConfig());
+
+        expect(registry.has("src/debug.log:")).toBe(false);
+        expect(registry.has("src/car.ts:")).toBe(true);
+      }));
+
+    test("excludes files inside a directory named by a bare pattern", () =>
+      withTempDir(async (root) => {
+        await writeFile(join(root, ".gitignore"), "dist\n");
+        await createFile(root, "src/dist/generated.ts", "export const x = 1;\n");
+        await createFile(root, "src/car.ts", "export class Car {}\n");
+
+        const { registry } = await buildRegistries(root, makeConfig());
+
+        expect(registry.has("src/dist/generated.ts:")).toBe(false);
+        expect(registry.has("src/car.ts:")).toBe(true);
+      }));
+
+    test("ignores negation lines starting with !", () =>
+      withTempDir(async (root) => {
+        await writeFile(join(root, ".gitignore"), "*.log\n!important.log\n");
+        await createFile(root, "src/debug.log", "log content\n");
+        await createFile(root, "src/important.log", "important log\n");
+
+        const { registry } = await buildRegistries(root, makeConfig());
+
+        expect(registry.has("src/debug.log:")).toBe(false);
+        expect(registry.has("src/important.log:")).toBe(false);
+      }));
+  });
+
+  describe("when no .gitignore file exists", () => {
+    test("proceeds without error", () =>
+      withTempDir(async (root) => {
+        await createFile(root, "src/car.ts", "export class Car {}\n");
+
+        const { registry, errors } = await buildRegistries(root, makeConfig());
+
+        expect(errors).toEqual([]);
+        expect(registry.has("src/car.ts:")).toBe(true);
+      }));
+  });
 });

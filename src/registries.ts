@@ -19,6 +19,22 @@ export type FileErrors = {
   errors: ParseError[];
 };
 
+async function readGitignorePatterns(projectRoot: string): Promise<string[]> {
+  try {
+    const content = await readFile(join(projectRoot, ".gitignore"), "utf-8");
+    return content
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith("#") && !line.startsWith("!"))
+      .flatMap((pattern) => {
+        const base = pattern.endsWith("/") ? pattern.slice(0, -1) : pattern;
+        return base.endsWith("/**") ? [base] : [base, `${base}/**`];
+      });
+  } catch {
+    return [];
+  }
+}
+
 function buildTemplateContent(lines: string[], nestedRefs: NestedRef[], relPath: string): string {
   const result: string[] = [];
   let i = 0;
@@ -49,7 +65,8 @@ export async function buildRegistries(
   const docsDir = join(projectRoot, config.source.docs);
   const targetDir = join(projectRoot, config.target);
 
-  const excludePatterns = config.source.excludeFromCode ?? [];
+  const gitignorePatterns = await readGitignorePatterns(projectRoot);
+  const excludePatterns = [...(config.source.excludeFromCode ?? []), ...gitignorePatterns];
 
   const entries = await fg("**/*", { cwd: sourceDir, dot: true, onlyFiles: true });
   for (const entry of entries) {
